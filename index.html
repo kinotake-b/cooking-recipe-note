@@ -118,6 +118,7 @@
   .hero { margin: 0 -16px 16px; }
   .hero img { width: 100%; max-height: 360px; aspect-ratio: 4 / 3; object-fit: cover; }
   .title { font: 600 26px/1.4 var(--serif); margin: 0 0 6px; }
+  .title.long { font-size: 21px; }
   .tagline { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: 14px; color: var(--sub); }
   .tagline .again { color: var(--accent); font-weight: 600; }
   .mades { margin-top: 10px; font-size: 13px; color: var(--sub); }
@@ -218,6 +219,56 @@
   .ck-nav .btn.mini { flex: none; padding: 0 16px; }
   .sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--bg); border-radius: 20px 20px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,.15); padding: 16px 20px calc(20px + env(safe-area-inset-bottom)); max-height: 70%; overflow: auto; }
 
+  /* マイページ:開閉する項目 */
+  details.acc { margin: 0; border-bottom: 1px solid var(--line); font-size: 16px; color: var(--ink); }
+  .acc > summary { list-style: none; display: flex; justify-content: space-between; align-items: center; min-height: 60px; }
+  .acc > summary::-webkit-details-marker { display: none; }
+  .acc .at { font: 600 19px/1.4 var(--serif); }
+  .acc .av { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--sub); }
+  .acc .av b { color: var(--ink); font: 600 18px var(--serif); }
+  .acc .av::after { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--sub); border-bottom: 2px solid var(--sub); transform: rotate(45deg) translateY(-2px); transition: transform .2s; }
+  .acc[open] .av::after { transform: rotate(-135deg) translateY(-2px); }
+  .accbody { padding: 4px 0 24px; }
+  button.stamp, button.cat { background: none; font: inherit; color: inherit; }
+  button.cat { display: block; width: 100%; text-align: left; }
+
+  /* 図鑑の解説ページ */
+  .dexhead { display: flex; gap: 16px; align-items: center; margin: 8px 0 20px; }
+  .dexhead .disc { width: 72px; height: 72px; flex: none; border-radius: 50%; border: 2px solid var(--accent); background: var(--tint); display: grid; place-items: center; font-size: 34px; line-height: 1; }
+  .dexlead { font-size: 17px; line-height: 1.9; margin: 0; }
+  .cchip.on { background: var(--tint); color: var(--accent); font-weight: 600; }
+  .rrow { display: flex; justify-content: space-between; gap: 12px; align-items: center; width: 100%; min-height: 52px; padding: 8px 0; border-bottom: 1px solid var(--line); text-align: left; }
+
+  /* 材料の補足・手順の見出し・箇条書き */
+  .summary { color: var(--sub); font-size: 15px; line-height: 1.8; margin: 4px 0 10px; }
+  .ing .nm { display: block; }
+  .ing .nm small { display: block; color: var(--sub); font-size: 13px; line-height: 1.5; margin-top: 2px; }
+  .steps .gh { display: block; font-size: 13px; font-weight: 600; color: var(--accent); padding: 22px 0 0; }
+  .steps li b { font-weight: 600; }
+  .pts { margin: 0; padding-left: 20px; }
+  .pts li { margin: 0 0 10px; line-height: 1.8; }
+  .pts li b { font-weight: 600; }
+  .ck-group { margin-left: 10px; font-size: 14px; color: var(--sub); font-weight: 500; }
+
+  /* 写真の切り抜き */
+  #crop { position: fixed; inset: 0; z-index: 50; background: #1f1c1a; color: #fff; display: none; flex-direction: column; }
+  #crop.on { display: flex; }
+  .cr-top { display: flex; align-items: center; justify-content: space-between; padding: calc(8px + env(safe-area-inset-top)) 8px 8px; }
+  .cr-top .btn.text { color: #e9e4db; }
+  .cr-top .btn.text.accent { color: #ff8d6e; font-weight: 700; }
+  .cr-stage { flex: 1; display: grid; place-items: center; touch-action: none; }
+  .cr-frame { position: relative; overflow: hidden; border-radius: 6px; background: #000; touch-action: none; box-shadow: 0 0 0 2px #fff; }
+  .cr-frame img { position: absolute; left: 0; top: 0; max-width: none; user-select: none; -webkit-user-drag: none; pointer-events: none; }
+  .cr-grid { position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(to right, transparent 33.2%, rgba(255,255,255,.35) 33.3%, transparent 33.5%, transparent 66.5%, rgba(255,255,255,.35) 66.6%, transparent 66.8%),
+                linear-gradient(to bottom, transparent 33.2%, rgba(255,255,255,.35) 33.3%, transparent 33.5%, transparent 66.5%, rgba(255,255,255,.35) 66.6%, transparent 66.8%); }
+  .cr-ctl { padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); max-width: 520px; width: 100%; margin: 0 auto; display: grid; gap: 14px; }
+  .cr-ratio { display: flex; gap: 8px; justify-content: center; }
+  .cr-ratio button { min-height: 40px; padding: 0 18px; border-radius: 99px; background: #3a3532; color: #fff; }
+  .cr-ratio button.on { background: #fff; color: #1f1c1a; font-weight: 600; }
+  .cr-zoom { display: flex; align-items: center; gap: 12px; font-size: 14px; white-space: nowrap; }
+  .cr-zoom input { flex: 1; width: auto; background: transparent; padding: 0; min-height: 32px; border: 0; accent-color: var(--accent); }
+
   .toast {
     position: fixed; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 40;
     max-width: 480px; margin: 0 auto; text-align: center; white-space: pre-line;
@@ -307,6 +358,9 @@
 <!-- マップ -->
 <div id="map" class="view"><div class="page" style="padding-top:0" id="mapBody"></div></div>
 
+<!-- 図鑑の解説 -->
+<div id="dex" class="view"><div class="page" id="dexBody"></div></div>
+
 <!-- 詳細 -->
 <div id="detail" class="view"><div class="page" id="detailBody"></div></div>
 
@@ -324,6 +378,8 @@
 
     <label class="l" for="fTitle">料理名</label>
     <input id="fTitle" placeholder="例:鶏むねの味噌マヨ焼き">
+    <label class="l" for="fSummary">ひとこと説明</label>
+    <textarea id="fSummary" rows="2" placeholder="料理の紹介文(なくてもOK)"></textarea>
     <label class="l" for="fCountry">国・地域</label>
     <select id="fCountry"></select>
     <label class="l" for="fIngredients">材料</label>
@@ -344,7 +400,8 @@
       <img id="fPhotoPreview" alt="" hidden>
       <div class="row" style="margin-top:0">
         <button class="btn" id="photoBtn">写真を選ぶ・撮る</button>
-        <button class="btn danger" id="photoDel" hidden>写真を消す</button>
+        <button class="btn" id="photoCrop" hidden>切り抜き直す</button>
+        <button class="btn danger" id="photoDel" hidden>消す</button>
       </div>
     </div>
     <input id="fPhoto" type="file" accept="image/*" hidden>
@@ -363,8 +420,9 @@
   <button class="tab on" id="tabList"><svg viewBox="0 0 24 24"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v15H5.5C4.7 19 4 18.3 4 17.5zM20 5.5c0-.8-.7-1.5-1.5-1.5H13v15h5.5c.8 0 1.5-.7 1.5-1.5z"/></svg>レシピ</button>
   <button class="tab" id="tabAsk"><svg viewBox="0 0 24 24"><path d="M5 5h14a1 1 0 011 1v9a1 1 0 01-1 1h-8l-4 3.5V16H5a1 1 0 01-1-1V6a1 1 0 011-1z"/></svg>相談</button>
   <button class="tab add" id="tabAdd" aria-label="レシピを追加"><span class="disc"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></button>
-  <button class="tab" id="tabMap"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/></svg>マップ</button>
+  <button class="tab" id="tabMap"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6"/><path d="M5 20c.8-3.7 3.5-5.6 7-5.6s6.2 1.9 7 5.6"/></svg>マイページ</button>
 </div></nav>
+<div id="crop"></div>
 <div id="toast" class="toast" hidden></div>
 
 <script>
@@ -418,20 +476,22 @@ function guessCountry(title, text) {
 }
 
 /* ---------- AIの回答を分ける ---------- */
-const SECTION = /^(材料|食材|作り方|つくり方|手順|レシピ|調理方法|保存方法|保存|保管方法|保管|日持ち|ポイント|コツ|ワンポイント|アレンジ|栄養)\s*(?:[（(][^）)]*[）)])?\s*[】\]」』]?\s*(?:[:：]\s*(.*))?$/;
+const SECTION = /^(材料|食材|作り方|つくり方|手順|レシピ|調理方法|保存方法|保存|保管方法|保管|日持ち|調理のポイント|調理のコツ|調理ポイント|料理のポイント|ポイント|コツ|ワンポイント|アレンジ|栄養)\s*(?:[（(][^）)]*[）)])?\s*[】\]」』]?\s*(?:[（(][^）)]*[）)])?\s*(?:[:：]\s*(.*))?$/;
 const SECTION_KEY = {
   材料: "ingredients", 食材: "ingredients",
   作り方: "steps", つくり方: "steps", 手順: "steps", レシピ: "steps", 調理方法: "steps",
   保存方法: "storage", 保存: "storage", 保管方法: "storage", 保管: "storage", 日持ち: "storage",
+  調理のポイント: "extra", 調理のコツ: "extra", 調理ポイント: "extra", 料理のポイント: "extra",
   ポイント: "extra", コツ: "extra", ワンポイント: "extra", アレンジ: "extra", 栄養: "extra",
 };
+const CHATTY = /^(はい|了解|もちろん|承知|わかりました|以下|こちら|それでは)/;
 const stripMark = s => s.replace(/\*\*/g, "").replace(/^[\s>#*\-■□●○◆◇▼▽◎【『「\[]+/, "").trim();
 
 function parseRecipe(text) {
-  const out = { title: "", ingredients: "", steps: "", storage: "", extra: "", found: [] };
+  const out = { title: "", summary: "", ingredients: "", steps: "", storage: "", extra: "", found: [] };
   const buf = { ingredients: [], steps: [], storage: [], extra: [] };
   const pre = [];
-  let cur = null, any = false;
+  let cur = null, any = false, titleLine = null;
   for (const raw of text.replace(/\r/g, "").split("\n")) {
     const line = raw.trim();
     if (!line) { if (cur) buf[cur].push(""); continue; }
@@ -444,19 +504,19 @@ function parseRecipe(text) {
     }
     const t = c.match(/^(?:料理名|メニュー|タイトル)\s*[:：]\s*(.+)$/);
     if (t && !out.title) { out.title = t[1].trim(); continue; }
-    if (cur) buf[cur].push(raw.replace(/\*\*/g, "").trimEnd());
+    if (cur) buf[cur].push(raw.replace(/\*\*/g, "").replace(/^(\s*)[*•●-]\s+/, "$1・").trimEnd());
     else pre.push(line);
   }
   if (!out.title) {
-    const cand =
+    titleLine =
       pre.find(l => /^#{1,4}\s/.test(l)) ||
       pre.find(l => /^【.+】$/.test(l)) ||
-      pre.find(l => l.length <= 30 && !/[。！!？?]$/.test(l) && !/^(はい|了解|もちろん|承知|わかりました|以下)/.test(l));
-    if (cand) out.title = stripMark(cand).replace(/[】』」\]]+$/, "");
+      pre.find(l => l.length <= 60 && !/[。！!？?]$/.test(l) && !CHATTY.test(l));
+    if (titleLine) out.title = stripMark(titleLine).replace(/[】』」\]]+$/, "");
   }
-  if (!any) {
-    buf.steps = pre.filter(l => stripMark(l) !== out.title).map(l => l.replace(/\*\*/g, ""));
-  }
+  const rest = pre.filter(l => l !== titleLine && !CHATTY.test(l) && !/^#{1,4}\s/.test(l)).map(l => l.replace(/\*\*/g, ""));
+  if (any) out.summary = rest.join(" ");     // 料理名の下にある紹介文
+  else buf.steps = rest;                      // 見出しが1つもないときは,全部を作り方にする
   for (const k of Object.keys(buf)) {
     out[k] = buf[k].join("\n").replace(/\n{3,}/g, "\n\n").trim();
     if (out[k]) out.found.push(k);
@@ -464,31 +524,67 @@ function parseRecipe(text) {
   return out;
 }
 
-/* 表示用:材料を「名前/分量」の行に,作り方を手順の配列に分ける */
+/* 「、」で区切る.ただしカッコの中の「、」では区切らない */
+function splitItems(text) {
+  const out = [];
+  for (const line of (text || "").split("\n")) {
+    let depth = 0, cur = "";
+    for (const ch of line) {
+      if ("（(".includes(ch)) depth++;
+      else if ("）)".includes(ch)) depth = Math.max(0, depth - 1);
+      if (depth === 0 && (ch === "、" || ch === "，" || ch === ",")) { out.push(cur); cur = ""; } else cur += ch;
+    }
+    out.push(cur);
+  }
+  return out;
+}
+
+/* 表示用:材料を「名前/分量/補足」の行に分ける */
 function ingredientRows(text) {
   const rows = [];
-  for (const seg of (text || "").split(/\n|[、，]/)) {
+  for (const seg of splitItems(text)) {
     let s = seg.replace(/\*\*/g, "").replace(/^[\s・\-*•●○■□]+/, "").trim();
     if (!s) continue;
     if (/^[【\[■▼].*[】\]]$/.test(s) || /[:：]$/.test(s)) { rows.push({ head: s.replace(/[【】\[\]■▼:：]/g, "") }); continue; }
     s = s.replace(/^[A-ZＡ-Ｚ][\s　.．:：)）]+/, "");
-    let m = s.match(/^(.+?)[\s　]+((?:大さじ|小さじ|約|少々|適量|少し|お好み|ひとつまみ|\d|[０-９]|半|ひとかけ).*)$/);
-    if (!m) m = s.match(/^([^\d０-９]+?)([\d０-９].*)$/);
-    rows.push(m ? { name: m[1].trim(), amount: m[2].trim() } : { name: s, amount: "" });
+    let name = s, amount = "";
+    const c = s.match(/^([^:：]{1,30})[:：]\s*(.+)$/);
+    if (c) { name = c[1].trim(); amount = c[2].trim(); }
+    else {
+      const m = s.match(/^(.+?)[\s　]+((?:大さじ|小さじ|約|少々|適量|少し|お好み|ひとつまみ|\d|[０-９]|半|ひとかけ|全量).*)$/) || s.match(/^([^\d０-９]+?)([\d０-９].*)$/);
+      if (m) { name = m[1].trim(); amount = m[2].trim(); }
+    }
+    const n = amount.match(/^([^（(]*)[（(](.*)[）)]\s*$/);     // 「120g（1枚）」→ 分量と補足
+    rows.push(n ? { name, amount: n[1].trim(), note: n[2].trim() } : { name, amount, note: "" });
   }
   return rows;
 }
+
+/* 作り方を手順の配列にする.番号つき・箇条書き・見出し(下準備など)に対応 */
 function parseSteps(text) {
-  const num = /^(?:\d+\s*[.．、)）]|[（(]\d+[)）]|[①-⑳])\s*(.*)$/;
-  const lines = (text || "").split("\n").map(l => l.trim()).filter(Boolean);
-  const numbered = lines.some(l => num.test(l));
-  const steps = [];
-  for (const l of lines) {
+  const num = /^(?:(\d+)\s*[.．、)）]|[（(](\d+)[)）]|([①-⑳]))\s*(.*)$/;
+  const bul = /^[・*\-•●]\s*(.*)$/;
+  const kinds = (text || "").split("\n").map(l => l.trim()).filter(Boolean).map(l => {
     const m = l.match(num);
-    if (m) { if (m[1]) steps.push(m[1]); }
-    else if (numbered && steps.length) steps[steps.length - 1] += " " + l;
-    else steps.push(l);
-  }
+    if (m) return { t: "num", n: +(m[1] || m[2] || 0), s: m[4] };
+    const b = l.match(bul);
+    return b ? { t: "bul", s: b[1] } : { t: "txt", s: l };
+  });
+  const structured = kinds.some(k => k.t !== "txt");
+  const steps = [];
+  let group = "";
+  kinds.forEach((k, i) => {
+    const nx = kinds[i + 1];
+    const short = k.s.length <= 24 && !/[。、，,！!]/.test(k.s);
+    const heading = short && nx && (
+      (k.t === "txt" && nx.t !== "txt") ||
+      (k.t === "num" && (nx.t === "bul" || (nx.t === "num" && nx.n <= k.n)))
+    );
+    if (heading) { group = k.s; return; }
+    if (structured && k.t === "txt" && steps.length) { steps[steps.length - 1].text += " " + k.s; return; }
+    const lm = k.s.match(/^([^:：。]{2,24})[:：]\s*(.+)$/);        // 「お肉を常温に戻す: 〜」→ 見出し語と本文
+    steps.push(lm ? { lead: lm[1], text: lm[2], group } : { lead: "", text: k.s, group });
+  });
   return steps;
 }
 
@@ -512,7 +608,7 @@ function categorize(name) {
 }
 function ingredientNames(text) {
   const names = [];
-  for (const l of (text || "").split(/\n|[、，]/)) {
+  for (const l of splitItems(text)) {
     let s = l.replace(/\*\*/g, "").replace(/^[\s・\-*•●○■□\d.)）]+/, "").trim();
     if (!s || /^[【\[■▼].*[】\]]$/.test(s) || /[:：]$/.test(s)) continue;
     s = s.replace(/^[A-ZＡ-Ｚ][\s　.．:：)）]+/, "").replace(/^[（(][^）)]*[）)]\s*/, "");
@@ -524,7 +620,7 @@ function ingredientNames(text) {
 
 /* ---------- データ ---------- */
 function normalize(r) {
-  r = { title: "", body: "", ingredients: "", steps: "", storage: "", extra: "", memo: "", country: "", photo: "", tags: [], made: [], lastMade: "", rating: 0, again: false, ...r };
+  r = { title: "", summary: "", body: "", ingredients: "", steps: "", storage: "", extra: "", memo: "", country: "", photo: "", tags: [], made: [], lastMade: "", rating: 0, again: false, ...r };
   if (r.body && !r.ingredients && !r.steps && !r.storage) {   // 以前の形式のレシピを分け直す
     const p = parseRecipe(r.body);
     r.ingredients = p.ingredients; r.steps = p.steps; r.storage = p.storage; r.extra = p.extra;
@@ -554,7 +650,7 @@ const stars = n => `<span class="stars" aria-label="評価 ${n}">${"★".repeat(
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const MIC = '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21"/></svg><span>話す</span>';
 
-const TITLES_BY_VIEW = { list: "レシピ帳", ask: "相談", map: "マップ" };
+const TITLES_BY_VIEW = { list: "レシピ帳", ask: "相談", map: "マイページ" };
 function show(name) {
   view = name;
   stopDictation();
@@ -656,7 +752,7 @@ function renderFilters() {
 }
 function matches(r) {
   const q = $("q").value.trim().toLowerCase();
-  const hay = [r.title, r.ingredients, r.steps, r.storage, r.extra, r.memo, r.country, r.tags.join(" ")].join(" ").toLowerCase();
+  const hay = [r.title, r.summary, r.ingredients, r.steps, r.storage, r.extra, r.memo, r.country, r.tags.join(" ")].join(" ").toLowerCase();
   if (q && !hay.includes(q)) return false;
   if (filter === "again") return r.again;
   if (filter === "top") return r.rating >= 4;
@@ -696,6 +792,26 @@ $("cards").onclick = e => {
 };
 
 /* ---------- 詳細 ---------- */
+const ingHtml = i => i.head
+  ? `<div class="subhead">${esc(i.head)}</div>`
+  : `<div class="ing"><span class="nm">${esc(i.name)}${i.note ? `<small>${esc(i.note)}</small>` : ""}</span><span class="amt">${esc(i.amount)}</span></div>`;
+const stepHtml = s => (s.lead ? `<b>${esc(s.lead)}</b> ` : "") + esc(s.text);
+function stepsHtml(steps) {
+  return `<ol class="steps">${steps.map((s, i) =>
+    (s.group && s.group !== steps[i - 1]?.group ? `<li class="gh">${esc(s.group)}</li>` : "") +
+    `<li><span class="n">${i + 1}</span><span>${stepHtml(s)}</span></li>`).join("")}</ol>`;
+}
+function notesHtml(text) {       // 箇条書きなら「見出し語+本文」の行に,そうでなければそのまま表示
+  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+  if (lines.length > 1 && lines.every(l => l.startsWith("・"))) {
+    return `<ul class="pts">${lines.map(l => {
+      const t = l.replace(/^・\s*/, "");
+      const m = t.match(/^([^:：。]{2,24})[:：]\s*(.+)$/);
+      return `<li>${m ? `<b>${esc(m[1])}</b> ${esc(m[2])}` : esc(t)}</li>`;
+    }).join("")}</ul>`;
+  }
+  return `<div class="note">${esc(text)}</div>`;
+}
 function openDetail(id) {
   current = id;
   const r = recipes.find(x => x.id === id);
@@ -704,7 +820,8 @@ function openDetail(id) {
   $("detailBody").innerHTML = `
     <div class="bar"><button class="back" id="toList">‹ 一覧</button><button class="btn text" id="toEdit">編集</button></div>
     ${r.photo ? `<div class="hero"><img src="${r.photo}" alt=""></div>` : ""}
-    <h1 class="title">${esc(r.title)}</h1>
+    <h1 class="title ${r.title.length > 22 ? "long" : ""}">${esc(r.title)}</h1>
+    ${r.summary ? `<p class="summary">${esc(r.summary)}</p>` : ""}
     <div class="tagline">
       ${r.country ? `<span>${FLAG[r.country] || ""} ${esc(r.country)}</span>` : ""}
       ${r.rating ? stars(r.rating) : ""}
@@ -717,12 +834,10 @@ function openDetail(id) {
     </div>
     <div class="mades">${r.made.length ? `作った記録:${r.made.slice().reverse().join(" / ")}` : "まだ作っていません"}</div>
     ${r.memo ? `<h2 class="sec">メモ</h2><div class="note">${esc(r.memo)}</div>` : ""}
-    ${ing.length ? `<h2 class="sec">材料</h2><div class="sm" style="margin:-4px 0 4px">タップでチェックできます</div>${ing.map(i => i.head
-      ? `<div class="subhead">${esc(i.head)}</div>`
-      : `<div class="ing"><span>${esc(i.name)}</span><span class="amt">${esc(i.amount)}</span></div>`).join("")}` : ""}
-    ${steps.length ? `<h2 class="sec">作り方</h2><ol class="steps">${steps.map((s, i) => `<li><span class="n">${i + 1}</span><span>${esc(s)}</span></li>`).join("")}</ol>` : ""}
-    ${r.storage ? `<h2 class="sec">保存方法</h2><div class="note">${esc(r.storage)}</div>` : ""}
-    ${r.extra ? `<h2 class="sec">ポイント・アレンジ</h2><div class="note">${esc(r.extra)}</div>` : ""}
+    ${ing.length ? `<h2 class="sec">材料</h2><div class="sm" style="margin:-4px 0 4px">タップでチェックできます</div>${ing.map(ingHtml).join("")}` : ""}
+    ${steps.length ? `<h2 class="sec">作り方</h2>${stepsHtml(steps)}` : ""}
+    ${r.storage ? `<h2 class="sec">保存方法</h2>${notesHtml(r.storage)}` : ""}
+    ${r.extra ? `<h2 class="sec">ポイント・アレンジ</h2>${notesHtml(r.extra)}` : ""}
     <div style="margin-top:40px"><button class="btn danger" id="del">このレシピを削除</button></div>`;
   show("detail");
 }
@@ -760,7 +875,8 @@ function closeCook() {
   $("cook").classList.remove("on");
 }
 function renderCook() {
-  const n = cookSteps.length, last = cookI === n - 1;
+  const n = cookSteps.length, last = cookI === n - 1, cur = cookSteps[cookI];
+  const plain = s => (s.lead ? s.lead + "：" : "") + s.text;
   const ing = ingredientRows(cookRecipe.ingredients);
   $("cook").innerHTML = `
     <div class="ck-top">
@@ -769,9 +885,11 @@ function renderCook() {
     </div>
     <div class="ck-prog"><i style="width:${(cookI + 1) / n * 100}%"></i></div>
     <div class="ck-main">
-      ${cookI > 0 ? `<div class="ck-near">${esc(cookSteps[cookI - 1])}</div>` : ""}
-      <div class="ck-cur"><span class="ck-num">${cookI + 1}</span><br>${esc(cookSteps[cookI])}</div>
-      ${!last ? `<div class="ck-near">${esc(cookSteps[cookI + 1])}</div>` : ""}
+      ${cookI > 0 ? `<div class="ck-near">${esc(plain(cookSteps[cookI - 1]))}</div>` : ""}
+      <div class="ck-cur">
+        <span class="ck-num">${cookI + 1}</span>${cur.group ? `<span class="ck-group">${esc(cur.group)}</span>` : ""}<br>${stepHtml(cur)}
+      </div>
+      ${!last ? `<div class="ck-near">${esc(plain(cookSteps[cookI + 1]))}</div>` : ""}
     </div>
     <div class="ck-nav">
       <button class="btn mini" data-ck="ing">材料</button>
@@ -779,7 +897,7 @@ function renderCook() {
       ${last ? '<button class="btn primary" data-ck="done">できた!</button>' : '<button class="btn primary" data-ck="next">次へ ›</button>'}
     </div>
     ${cookSheet ? `<div class="sheet"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font:600 17px var(--serif)">材料</b><button class="btn text" data-ck="ing">閉じる</button></div>
-      ${ing.map(i => i.head ? `<div class="subhead">${esc(i.head)}</div>` : `<div class="ing"><span>${esc(i.name)}</span><span class="amt">${esc(i.amount)}</span></div>`).join("")}</div>` : ""}`;
+      ${ing.map(ingHtml).join("")}</div>` : ""}`;
 }
 $("cook").onclick = e => {
   const ing = e.target.closest(".sheet .ing");
@@ -808,6 +926,7 @@ function drawPhoto() {
   $("fPhotoPreview").hidden = !photo;
   $("fPhotoPreview").src = photo || "";
   $("photoDel").hidden = !photo;
+  $("photoCrop").hidden = !photo;
 }
 function openEdit(id) {
   current = id;
@@ -815,6 +934,7 @@ function openEdit(id) {
   $("fPaste").value = "";
   $("parseNote").textContent = "";
   $("fTitle").value = r.title;
+  $("fSummary").value = r.summary;
   $("fCountry").value = r.country;
   $("fIngredients").value = r.ingredients;
   $("fSteps").value = r.steps;
@@ -835,6 +955,7 @@ function applyParse() {
   if (!text.trim()) return;
   const p = parseRecipe(text);
   if (p.title) $("fTitle").value = p.title;
+  $("fSummary").value = p.summary;
   $("fIngredients").value = p.ingredients;
   $("fSteps").value = p.steps;
   $("fStorage").value = p.storage;
@@ -852,32 +973,99 @@ function applyParse() {
 $("fPaste").addEventListener("paste", () => setTimeout(applyParse, 0));
 $("parse").onclick = applyParse;
 
-function resizeImage(file, max = 720) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const s = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement("canvas");
-      c.width = Math.round(img.width * s);
-      c.height = Math.round(img.height * s);
-      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url);
-      resolve(c.toDataURL("image/jpeg", 0.7));
+/* ---------- 写真(切り抜き) ---------- */
+let crop = null;
+const ptrs = new Map();
+let pinchDist = 0;
+const dist = () => { const [a, b] = [...ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+
+function openCrop(src, revoke) {
+  const img = new Image();
+  img.onload = () => {
+    crop = { img, src, revoke, ratio: 1, zoom: 1, cx: img.naturalWidth / 2, cy: img.naturalHeight / 2, fw: 0, fh: 0, s0: 1, sc: 1, x: 0, y: 0 };
+    $("crop").innerHTML = `
+      <div class="cr-top"><button class="btn text" data-cr="cancel">キャンセル</button><b>写真を切り抜く</b><button class="btn text accent" data-cr="ok">決定</button></div>
+      <div class="cr-stage"><div class="cr-frame" id="crFrame"><img id="crImg" alt=""><div class="cr-grid"></div></div></div>
+      <div class="cr-ctl">
+        <div class="cr-ratio"><button data-cr="r1" class="on">正方形</button><button data-cr="r43">4:3</button></div>
+        <label class="cr-zoom">拡大<input type="range" id="crZoom" min="1" max="4" step="0.01" value="1"></label>
+        <div class="sm" style="color:#bdb7ad;text-align:center">ドラッグで位置を動かします．二本指でも拡大できます</div>
+      </div>`;
+    $("crImg").src = src;
+    const frame = $("crFrame");
+    frame.onpointerdown = e => { frame.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (ptrs.size === 2) pinchDist = dist(); };
+    frame.onpointermove = e => {
+      const p = ptrs.get(e.pointerId);
+      if (!p || !crop) return;
+      const dx = e.clientX - p.x, dy = e.clientY - p.y;
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (ptrs.size === 1) { crop.cx -= dx / crop.sc; crop.cy -= dy / crop.sc; placeCrop(); }
+      else if (ptrs.size === 2) {
+        const d = dist();
+        if (pinchDist) { crop.zoom = Math.min(4, Math.max(1, crop.zoom * d / pinchDist)); $("crZoom").value = crop.zoom; placeCrop(); }
+        pinchDist = d;
+      }
     };
-    img.onerror = reject;
-    img.src = url;
-  });
+    frame.onpointerup = frame.onpointercancel = e => { ptrs.delete(e.pointerId); pinchDist = 0; };
+    $("crZoom").oninput = e => { crop.zoom = +e.target.value; placeCrop(); };
+    $("crop").classList.add("on");
+    layoutCrop();
+  };
+  img.onerror = () => { if (revoke) URL.revokeObjectURL(src); alert("写真を読み込めませんでした．"); };
+  img.src = src;
 }
+function layoutCrop() {
+  const c = crop;
+  c.fw = Math.min(innerWidth - 32, 480);
+  c.fh = c.fw / c.ratio;
+  $("crFrame").style.width = c.fw + "px";
+  $("crFrame").style.height = c.fh + "px";
+  c.s0 = Math.max(c.fw / c.img.naturalWidth, c.fh / c.img.naturalHeight);   // 枠をちょうど覆う大きさ
+  placeCrop();
+}
+function placeCrop() {
+  const c = crop, w = c.img.naturalWidth, h = c.img.naturalHeight, sc = c.s0 * c.zoom;
+  let x = c.fw / 2 - c.cx * sc, y = c.fh / 2 - c.cy * sc;
+  x = Math.min(0, Math.max(c.fw - w * sc, x));      // 枠から写真がはみ出さないようにする
+  y = Math.min(0, Math.max(c.fh - h * sc, y));
+  c.cx = (c.fw / 2 - x) / sc; c.cy = (c.fh / 2 - y) / sc;
+  Object.assign(c, { x, y, sc });
+  const im = $("crImg");
+  im.style.width = w * sc + "px"; im.style.height = h * sc + "px";
+  im.style.transform = `translate(${x}px, ${y}px)`;
+}
+function closeCrop() {
+  $("crop").classList.remove("on");
+  if (crop?.revoke) URL.revokeObjectURL(crop.src);
+  crop = null; ptrs.clear(); $("crop").innerHTML = "";
+}
+function finishCrop() {
+  const c = crop, out = document.createElement("canvas");
+  out.width = 720; out.height = Math.round(720 / c.ratio);
+  out.getContext("2d").drawImage(c.img, -c.x / c.sc, -c.y / c.sc, c.fw / c.sc, c.fh / c.sc, 0, 0, out.width, out.height);
+  photo = out.toDataURL("image/jpeg", 0.72);
+  closeCrop(); drawPhoto();
+}
+$("crop").onclick = e => {
+  const k = e.target.closest("[data-cr]")?.dataset.cr;
+  if (!k || !crop) return;
+  if (k === "cancel") closeCrop();
+  if (k === "ok") finishCrop();
+  if (k === "r1" || k === "r43") {
+    crop.ratio = k === "r1" ? 1 : 4 / 3;
+    $("crop").querySelectorAll(".cr-ratio button").forEach(b => b.classList.toggle("on", b.dataset.cr === k));
+    layoutCrop();
+  }
+};
 $("photoBtn").onclick = () => $("fPhoto").click();
-$("fPhoto").onchange = async e => {
+$("fPhoto").onchange = e => {
   const f = e.target.files[0];
-  if (!f) return;
-  try { photo = await resizeImage(f); drawPhoto(); }
-  catch { alert("写真を読み込めませんでした．"); }
+  if (f) openCrop(URL.createObjectURL(f), true);
   e.target.value = "";
 };
+$("photoCrop").onclick = () => { if (photo) openCrop(photo, false); };
 $("photoDel").onclick = () => { photo = ""; drawPhoto(); };
+
 
 $("cancel").onclick = () => current ? openDetail(current) : (renderList(), show("list"));
 $("save").onclick = () => {
@@ -887,6 +1075,7 @@ $("save").onclick = () => {
   if (!title) { alert("料理名か作り方を入力してください．"); return; }
   const data = {
     title, steps, photo, rating,
+    summary: $("fSummary").value.trim(),
     country: $("fCountry").value,
     ingredients: $("fIngredients").value.trim(),
     storage: $("fStorage").value.trim(),
@@ -914,8 +1103,55 @@ $("save").onclick = () => {
   openDetail(id);
 };
 
-/* ---------- マップ ---------- */
-function renderMap() {
+/* ---------- マイページ・図鑑 ---------- */
+/* 解説文は,チームのアプリの図鑑と同じ方針で書いた(1〜2文・やわらかく・断定しすぎない).
+   一般に知られている特徴だけを書いているので,公開前に事実を確かめること. */
+const CUISINE_INFO = {
+  日本: { desc: "だしと醤油・味噌で素材の味を生かし，季節の移り変わりを料理に映す．ご飯を中心に，汁物とおかずを組み合わせて食べる．", taste: "うま味が土台で，塩気と甘みの釣り合いが穏やか．", staples: ["醤油", "味噌", "みりん", "だし", "米"], dishes: ["肉じゃが", "味噌汁", "天ぷら", "親子丼"] },
+  中国: { desc: "広い国土で地方ごとに味が大きく違う．四川は辛さと痺れ，広東はあっさり，北方は小麦の麺や餃子が中心．強火で一気に炒める調理が特徴的．", taste: "油のコクに，醤油・酢・香辛料が重なる．地方で辛さも変わる．", staples: ["醤油", "酢", "豆板醤", "花椒", "ごま油"], dishes: ["麻婆豆腐", "餃子", "チャーハン", "青椒肉絲"] },
+  韓国: { desc: "発酵食品と唐辛子が味の軸．キムチやコチュジャンのほか，ごま油とにんにくの香りで仕上げる料理が多い．", taste: "辛さに甘みとうま味が重なる．ごま油の香ばしさがある．", staples: ["コチュジャン", "唐辛子粉", "ごま油", "にんにく", "キムチ"], dishes: ["ビビンバ", "チヂミ", "プルコギ", "スンドゥブ"] },
+  台湾: { desc: "屋台や夜市の文化が盛んで，一皿が小ぶり．醤油で煮込む料理や，八角の香りの料理がよく知られている．", taste: "醤油の甘じょっぱさに，八角などの香りが重なる．", staples: ["醤油", "八角", "五香粉", "揚げ赤ねぎ", "米"], dishes: ["魯肉飯", "牛肉麺"] },
+  タイ: { desc: "甘い・辛い・酸っぱい・塩辛いのバランスを大切にし，ハーブの香りを重ねる．ココナッツミルクを使う煮込みも多い．", taste: "辛さと酸味がはっきりしていて，ハーブの香りが立つ．", staples: ["ナンプラー", "レモングラス", "ライム", "唐辛子", "ココナッツミルク"], dishes: ["ガパオ", "トムヤムクン", "グリーンカレー", "パッタイ"] },
+  ベトナム: { desc: "生のハーブや野菜をたっぷり添え，魚醤で味をつける．米粉の麺や，米の皮で包む料理が多い．", taste: "さっぱりと軽く，ハーブとライムの香りが合わさる．", staples: ["魚醤(ニョクマム)", "ライスヌードル", "ミント", "香菜", "ライム"], dishes: ["フォー", "生春巻き", "バインミー"] },
+  フィリピン: { desc: "酢や醤油を使った煮込みがよく食べられる．甘みと酸味，塩気が合わさったはっきりした味が多い．", taste: "酸味と塩気が前に出て，甘みがそれを丸くする．", staples: ["酢", "醤油", "にんにく", "月桂樹の葉"], dishes: ["アドボ", "シニガン"] },
+  インドネシア: { desc: "甘い醤油や，唐辛子のペースト(サンバル)，ココナッツを使った料理が多い．炒めご飯や串焼きが身近．", taste: "甘辛い味つけに，ココナッツとスパイスの香りが重なる．", staples: ["甘い醤油", "サンバル", "ココナッツ", "えびのペースト", "米"], dishes: ["ナシゴレン", "サテ", "ガドガド"] },
+  マレーシア: { desc: "マレー系・中華系・インド系の料理が混ざり合う．ココナッツミルクとスパイスを使った麺やご飯が知られている．", taste: "ココナッツのまろやかさに，辛さとスパイスが重なる．", staples: ["ココナッツミルク", "唐辛子", "レモングラス", "米", "麺"], dishes: ["ラクサ", "ナシレマ", "海南鶏飯"] },
+  インド: { desc: "スパイスの組み合わせで味をつくる．地域や宗教で食べるものが違い，野菜や豆を中心にした料理も多い．", taste: "複数のスパイスが重なり，香りと辛さが層になる．", staples: ["クミン", "ターメリック", "コリアンダー", "ギー", "ヨーグルト"], dishes: ["ダール", "タンドリーチキン", "ビリヤニ", "サグパニール"] },
+  トルコ: { desc: "肉・ヨーグルト・ナス・トマト・オリーブ油を多く使う．小皿の前菜(メゼ)から始まる食事の形がある．", taste: "素材の味が分かりやすく，ヨーグルトの酸味が合わさる．", staples: ["ヨーグルト", "ナス", "羊肉", "オリーブ油", "トマト"], dishes: ["ケバブ", "ドルマ", "メゼ"] },
+  中東: { desc: "ひよこ豆，ごまのペースト，オリーブ油，レモン，ハーブがよく使われる．パンに挟んだり，つけて食べたりする料理が多い．", taste: "豆とごまのコクに，レモンの酸味とハーブの香りが加わる．", staples: ["ひよこ豆", "タヒニ(ごまのペースト)", "オリーブ油", "レモン", "パセリ"], dishes: ["フムス", "ファラフェル", "タブーレ"] },
+  モロッコ: { desc: "円錐形のふたの土鍋(タジン)で作る煮込みや，粒状のパスタ(クスクス)が知られている．肉とドライフルーツを合わせる料理もある．", taste: "シナモンやクミンの香りに，甘みと塩気が重なる．", staples: ["クスクス", "クミン", "シナモン", "オリーブ", "ドライフルーツ"], dishes: ["タジン", "クスクス"] },
+  アフリカ: { desc: "とても広く，地域で食文化が大きく違う．西アフリカのトマトで炊くご飯や，エチオピアの発酵させた薄焼き(インジェラ)と煮込みなどがある．", taste: "地域で大きく変わる．トマトや唐辛子，スパイスがよく使われる．", staples: ["トマト", "唐辛子", "キャッサバ", "雑穀", "豆"], dishes: ["ジョロフライス", "インジェラ"] },
+  ジョージア: { desc: "ワインの産地として知られ，くるみやハーブ，スパイスを使うソースが多い．チーズを入れたパン料理が親しまれている．", taste: "くるみのコクとハーブの香り，にんにくの風味が特徴的．", staples: ["くるみ", "にんにく", "チーズ", "コリアンダー", "ザクロ"], dishes: ["ハチャプリ", "シュクメルリ", "ヒンカリ"] },
+  ギリシャ: { desc: "地中海の料理で，オリーブ油，レモン，ハーブ，チーズを多く使う．野菜と魚介が食卓によく並ぶ．", taste: "オリーブ油のコクに，レモンの酸味とハーブの香りが重なる．", staples: ["オリーブ油", "レモン", "フェタチーズ", "オレガノ", "ヨーグルト"], dishes: ["ムサカ", "ギロ", "ギリシャサラダ", "ツァジキ"] },
+  イタリア: { desc: "少ない素材の組み合わせで味をつくり，地方ごとの色が強い．パスタ，オリーブ油，トマト，チーズが中心になる．", taste: "素材の味が主役．トマトの酸味とチーズのコクが軸になる．", staples: ["オリーブ油", "トマト", "チーズ", "にんにく", "バジル"], dishes: ["カルボナーラ", "ボロネーゼ", "リゾット", "マルゲリータ"] },
+  フランス: { desc: "ソースと技法が体系的にまとまっている．バターや生クリーム，ワインを使った料理が多く，地方ごとの郷土料理も豊か．", taste: "バターやクリームのコクに，ワインや香草の風味が重なる．", staples: ["バター", "生クリーム", "ワイン", "マスタード", "タイム"], dishes: ["ポトフ", "ラタトゥイユ", "キッシュ", "ブイヤベース"] },
+  スペイン: { desc: "オリーブ油，にんにく，パプリカの粉，魚介，米がよく使われる．小皿で少しずつ食べる習慣(タパス)がある．", taste: "にんにくとオリーブ油の香りに，パプリカの風味が重なる．", staples: ["オリーブ油", "にんにく", "パプリカパウダー", "サフラン", "米"], dishes: ["パエリア", "アヒージョ", "スペインオムレツ", "ガスパチョ"] },
+  ポルトガル: { desc: "魚介と米の料理が多く，干しだらを使った料理で知られている．オリーブ油とにんにくで素朴に味つけをする．", taste: "魚介のうま味に，オリーブ油とにんにくの香りが重なる．", staples: ["干しだら", "オリーブ油", "にんにく", "米", "じゃがいも"], dishes: ["干しだらの料理", "イワシの塩焼き", "カルド・ヴェルデ"] },
+  ドイツ: { desc: "ソーセージ，じゃがいも，酢漬けのキャベツ，パンが食卓の中心．肉を煮込んだり，薄くのして揚げ焼きにしたりする料理が知られている．", taste: "どっしりとした肉とじゃがいもに，酢の酸味が合わさる．", staples: ["ソーセージ", "じゃがいも", "ザワークラウト", "マスタード", "ライ麦パン"], dishes: ["シュニッツェル", "アイスバイン", "焼きじゃがいも"] },
+  イギリス: { desc: "ローストした肉，煮込み，パイ，魚のフライなどが知られている．素材の味をそのまま生かす料理が多い．", taste: "素朴で塩気が控えめ．ソースや酢で好みに味を足して食べる．", staples: ["じゃがいも", "牛肉", "小麦粉", "バター", "モルトビネガー"], dishes: ["フィッシュ&チップス", "シェパーズパイ", "ローストビーフ"] },
+  北欧: { desc: "サーモンやニシンなどの魚，ライ麦のパン，ベリーが特徴的．塩漬け・酢漬け・燻製などの保存食の文化が根づいている．", taste: "塩気と酸味のはっきりした味に，ディルの香りが合わさる．", staples: ["サーモン", "ニシン", "ディル", "ライ麦パン", "ベリー"], dishes: ["ミートボール", "サーモンの塩漬け"] },
+  "ロシア・東欧": { desc: "ビーツやキャベツ，サワークリームを使った煮込みやスープが多い．寒い気候に合う，体の温まる料理が親しまれている．", taste: "酸味のある野菜に，サワークリームのコクが重なる．", staples: ["ビーツ", "キャベツ", "サワークリーム", "ディル", "じゃがいも"], dishes: ["ボルシチ", "ビーフストロガノフ", "ピロシキ", "グヤーシュ"] },
+  アメリカ: { desc: "さまざまな地域から来た人々の食文化が混ざり合っている．バーベキューやハンバーガーなど，量の多い肉料理が身近．", taste: "肉の旨みに，甘みのあるソースや塩気がはっきり合わさる．", staples: ["牛肉", "とうもろこし", "バーベキューソース", "チェダーチーズ", "バター"], dishes: ["ハンバーガー", "BBQリブ", "クラムチャウダー", "マカロニ&チーズ"] },
+  メキシコ: { desc: "とうもろこしの生地(トルティーヤ)，唐辛子，豆，ライムが土台．具を包んだり，ソースをかけたりして食べる．", taste: "唐辛子の辛さに，ライムの酸味と香菜の香りが重なる．", staples: ["とうもろこし", "唐辛子", "豆", "ライム", "香菜"], dishes: ["タコス", "ワカモレ", "モレ", "ケサディーヤ"] },
+  ペルー: { desc: "じゃがいもと唐辛子(アヒ)の原産地のひとつで，魚介をライムでしめた料理が知られている．日本や中国の影響を受けた料理もある．", taste: "ライムの酸味と唐辛子の辛さが合わさり，さっぱりしている．", staples: ["ライム", "唐辛子(アヒ)", "じゃがいも", "とうもろこし", "魚介"], dishes: ["セビーチェ", "ロモ・サルタード"] },
+  ブラジル: { desc: "黒豆と肉の煮込みや，炭火で焼いた肉(シュラスコ)が知られている．ご飯と豆を一緒に食べる食事の形が一般的．", taste: "豆と肉のコクに，にんにくと塩のはっきりした味が合わさる．", staples: ["黒豆", "米", "キャッサバ粉", "にんにく", "牛肉"], dishes: ["フェイジョアーダ", "シュラスコ", "パン・デ・ケージョ"] },
+};
+const CAT_INFO = {
+  肉: { desc: "たんぱく質と脂のうま味の中心．部位によって向く火の入れ方が違い，脂の多い部位は強めに焼き，淡白な部位は火を通しすぎないのがコツ．", tip: "焼く前に常温に近づけると，火が均一に入りやすい．" },
+  魚介: { desc: "鮮度と下処理で味が大きく変わる．火を通しすぎると身が固くなる．", tip: "塩を振って少し置き，出てきた水気を拭くと臭みが減る．" },
+  野菜: { desc: "香り・食感・色を足す脇役から主役まで幅が広い．火の通りやすさが違うので，かたいものから先に入れる．", tip: "根菜は早めに，葉物は最後に入れるのが基本．" },
+  きのこ: { desc: "うま味を多く含み，加えるだけでだしのような役割もする．洗いすぎず，加熱して香りを引き出す．", tip: "水洗いせず，汚れは拭き取って石づきを落とすだけにする．" },
+  "卵・乳": { desc: "コクとなめらかさを加える．高温で一気に加熱すると固まりやすいので，火加減が味を左右する．", tip: "卵黄やチーズは火を止めてから混ぜると，ダマになりにくい．" },
+  "豆・大豆": { desc: "たんぱく質が豊富で，豆腐や納豆など形を変えて使われる．味がやさしく，ほかの味をよく吸う．", tip: "豆腐は水気を切ると，味がなじみやすい．" },
+  "穀物・麺": { desc: "主食になる食材．茹で時間や水加減で食感が決まる．", tip: "パスタは茹で汁を少し残しておくと，ソースがなじむ．" },
+  果物: { desc: "酸味と甘みで料理に変化をつける．肉料理のソースやドレッシングにも使われる．", tip: "柑橘は加熱の最後に絞ると，香りが残る．" },
+  調味料: { desc: "味の土台をつくる．砂糖・塩・酢・醤油・味噌のほか，国ごとに特徴的なものがある．", tip: "入れる順番を意識すると，味が決まりやすい(砂糖→塩→酢→醤油・味噌が目安)．" },
+  その他: { desc: "どのグループにも入らなかった食材．名前が長いときなどは分類できないことがある．", tip: "気になる食材は，編集で名前を短くすると分類されやすい．" },
+};
+
+let myOpen = { world: false, food: false, xp: false };
+
+function myStats() {
   const cooked = recipes.filter(r => r.made.length);
   const by = {};
   for (const r of recipes) {
@@ -923,11 +1159,6 @@ function renderMap() {
     by[r.country] ??= { cooked: 0, saved: 0 };
     by[r.country][r.made.length ? "cooked" : "saved"]++;
   }
-  const world = CUISINES.filter(c => c[0] !== "その他");
-  const done = world.filter(c => by[c[0]]?.cooked).length;
-  const todo = world.filter(c => !by[c[0]]?.cooked);
-  const pick = todo.length ? todo[Math.floor(Date.now() / 864e5) % todo.length] : null;
-
   const counts = {};
   for (const r of cooked) {
     for (const name of ingredientNames(r.ingredients)) {
@@ -936,8 +1167,18 @@ function renderMap() {
       counts[cat][name] = (counts[cat][name] || 0) + 1;
     }
   }
+  return { cooked, by, counts };
+}
+
+function renderMap() {
+  const { by, counts } = myStats();
+  const world = CUISINES.filter(c => c[0] !== "その他");
+  const done = world.filter(c => by[c[0]]?.cooked).length;
+  const todo = world.filter(c => !by[c[0]]?.cooked);
+  const pick = todo.length ? todo[Math.floor(Date.now() / 864e5) % todo.length] : null;
   const total = Object.values(counts).reduce((n, o) => n + Object.keys(o).length, 0);
   const L = levelOf(meta.xp), hi = need(L + 1);
+  const open = k => (myOpen[k] ? "open" : "");
 
   $("mapBody").innerHTML = `
     <div class="profile">
@@ -949,40 +1190,112 @@ function renderMap() {
       <div class="stat"><b>${recipes.reduce((n, r) => n + r.made.length, 0)}</b><span class="sm">作った回数</span></div>
       <div class="stat"><b>${recipes.length}</b><span class="sm">レシピ</span></div>
     </div>
-    <details><summary>XPのもらい方</summary><ul>${XP_RULES.map(t => `<li>${t}</li>`).join("")}</ul></details>
-    ${meta.log.length ? `<details><summary>最近のXP</summary><ul>${meta.log.slice(0, 8).map(l => `<li>${l.d} ${esc(l.why)} +${l.p}</li>`).join("")}</ul></details>` : ""}
 
-    <h2 class="sec">世界の料理</h2>
-    <div class="sm">作った国・地域 <b style="color:var(--ink);font:600 18px var(--serif)">${done}</b> / ${world.length}</div>
-    <div class="meter"><i style="width:${Math.round(done / world.length * 100)}%"></i></div>
-    <div class="stamps">
-      ${world.map(([name, flag]) => {
-        const s = by[name];
-        const cls = s?.cooked ? "cooked" : s ? "saved" : "";
-        const note = s?.cooked ? `${s.cooked}品` : s ? `気になる${s.saved}` : "";
-        return `<div class="stamp ${cls}" data-c="${esc(name)}"><div class="disc"><span>${flag}</span></div><div class="nm">${esc(name)}</div><div class="ct">${note || "&nbsp;"}</div></div>`;
-      }).join("")}
-    </div>
-    ${pick ? `<div class="nextbox">次は ${pick[1]} <b>${esc(pick[0])}</b> の料理はどうですか?<br><span class="sm">AIに「${esc(pick[0])}の家庭料理を教えて」と聞いてみましょう．</span></div>` : `<div class="nextbox">すべての国・地域を制覇しました!</div>`}
+    <h2 class="sec" style="border:0;margin:28px 0 0;padding:0">わたしの図鑑</h2>
+    <div class="sm">項目をひらくと，作った記録と解説が見られます．</div>
 
-    <h2 class="sec">食材</h2>
-    <div class="sm">使った食材 <b style="color:var(--ink);font:600 18px var(--serif)">${total}</b> 種類(「今日作った」を押したレシピの材料から数えています)</div>
-    <div style="margin-top:8px">
-      ${CAT_ORDER.map(cat => {
-        const items = Object.entries(counts[cat] || {}).sort((a, b) => b[1] - a[1]);
-        return `<div class="cat ${items.length ? "" : "none"}">
-          <h3>${cat}<span>${items.length}種類</span></h3>
-          ${items.length ? items.map(([n, c]) => `<span class="cchip">${esc(n)}${c > 1 ? ` <b>×${c}</b>` : ""}</span>`).join("") : '<span class="sm">まだありません</span>'}
-        </div>`;
-      }).join("")}
-    </div>`;
+    <details class="acc" data-k="world" ${open("world")}>
+      <summary><span class="at">世界の料理</span><span class="av"><b>${done}</b> / ${world.length}</span></summary>
+      <div class="accbody">
+        <div class="meter"><i style="width:${Math.round(done / world.length * 100)}%"></i></div>
+        <div class="stamps">
+          ${world.map(([name, flag]) => {
+            const s = by[name];
+            const cls = s?.cooked ? "cooked" : s ? "saved" : "";
+            const note = s?.cooked ? `${s.cooked}品` : s ? `気になる${s.saved}` : "";
+            return `<button class="stamp ${cls}" data-c="${esc(name)}"><div class="disc"><span>${flag}</span></div><div class="nm">${esc(name)}</div><div class="ct">${note || "&nbsp;"}</div></button>`;
+          }).join("")}
+        </div>
+        ${pick ? `<div class="nextbox">次は ${pick[1]} <b>${esc(pick[0])}</b> の料理はどうですか?<br><span class="sm">国をタップすると解説が読めます．</span></div>` : `<div class="nextbox">すべての国・地域を制覇しました!</div>`}
+      </div>
+    </details>
+
+    <details class="acc" data-k="food" ${open("food")}>
+      <summary><span class="at">食材</span><span class="av"><b>${total}</b> 種類</span></summary>
+      <div class="accbody">
+        <div class="sm" style="margin-bottom:4px">「今日作った」を押したレシピの材料から数えています．</div>
+        ${CAT_ORDER.map(cat => {
+          const items = Object.entries(counts[cat] || {}).sort((a, b) => b[1] - a[1]);
+          return `<button class="cat ${items.length ? "" : "none"}" data-cat="${esc(cat)}">
+            <h3>${cat}<span>${items.length}種類 ›</span></h3>
+            ${items.length ? items.slice(0, 12).map(([n, c]) => `<span class="cchip">${esc(n)}${c > 1 ? ` <b>×${c}</b>` : ""}</span>`).join("") : '<span class="sm">まだありません</span>'}
+          </button>`;
+        }).join("")}
+      </div>
+    </details>
+
+    <details class="acc" data-k="xp" ${open("xp")}>
+      <summary><span class="at">レベルとXP</span><span class="av">Lv.${L}</span></summary>
+      <div class="accbody sm">
+        <div style="margin-bottom:6px">XPのもらい方</div>
+        <ul style="margin:0 0 12px;padding-left:20px">${XP_RULES.map(t => `<li>${t}</li>`).join("")}</ul>
+        ${meta.log.length ? `<div style="margin-bottom:6px">最近のXP</div><ul style="margin:0;padding-left:20px">${meta.log.slice(0, 8).map(l => `<li>${l.d} ${esc(l.why)} +${l.p}</li>`).join("")}</ul>` : ""}
+      </div>
+    </details>`;
 }
+$("mapBody").addEventListener("toggle", e => {          // 開いた・閉じたを覚えておく(作り直しても同じ状態にする)
+  const k = e.target.dataset?.k;
+  if (k) myOpen[k] = e.target.open;
+}, true);
 $("mapBody").onclick = e => {
-  const t = e.target.closest(".stamp");
-  if (!t || !(t.classList.contains("cooked") || t.classList.contains("saved"))) return;
-  filter = "country:" + t.dataset.c;
-  $("q").value = "";
-  renderList(); show("list");
+  const s = e.target.closest(".stamp");
+  if (s) return openCountry(s.dataset.c);
+  const c = e.target.closest(".cat");
+  if (c) openCategory(c.dataset.cat);
+};
+
+/* 図鑑の解説ページ(国・食材グループで共通の型) */
+function dexShell(inner) {
+  $("dexBody").innerHTML = `<div class="bar"><button class="back" data-dx="back">‹ マイページ</button></div>${inner}`;
+  show("dex");
+}
+function openCountry(name) {
+  const info = CUISINE_INFO[name];
+  if (!info) return;
+  const mine = recipes.filter(r => r.country === name);
+  const cookedN = mine.filter(r => r.made.length).length;
+  const used = [...new Set(recipes.filter(r => r.made.length).flatMap(r => ingredientNames(r.ingredients)))];
+  const usedIt = s => used.some(u => u.includes(s) || s.includes(u));
+  dexShell(`
+    <div class="dexhead">
+      <div class="disc"><span>${FLAG[name]}</span></div>
+      <div><div class="sm">世界の料理</div><h1 class="title" style="margin:0">${esc(name)}</h1>
+      <div class="sm">${cookedN ? `作った ${cookedN}品` : mine.length ? `気になる ${mine.length}品` : "まだ出会っていません"}</div></div>
+    </div>
+    <p class="dexlead">${esc(info.desc)}</p>
+    <h2 class="sec">味の特徴</h2>
+    <p style="margin:0">${esc(info.taste)}</p>
+    <h2 class="sec">よく使う食材・調味料</h2>
+    <div>${info.staples.map(s => `<span class="cchip ${usedIt(s) ? "on" : ""}">${esc(s)}</span>`).join("")}</div>
+    <div class="sm" style="margin-top:4px">色がついているものは，作ったレシピで使ったことがある食材です．</div>
+    <h2 class="sec">代表的な料理</h2>
+    <div>${info.dishes.map(s => `<span class="cchip">${esc(s)}</span>`).join("")}</div>
+    <h2 class="sec">わたしの記録</h2>
+    ${mine.length ? mine.map(r => `<button class="rrow" data-id="${r.id}"><span>${esc(r.title)}</span><span class="sm">${r.made.length ? `${r.made.length}回作った` : "気になる"}</span></button>`).join("") : '<div class="sm">この国のレシピはまだありません．</div>'}
+    <div class="row" style="margin-top:20px">
+      <button class="btn primary" data-dx="ask" data-c="${esc(name)}">この国のレシピをAIに聞く</button>
+    </div>`);
+}
+function openCategory(cat) {
+  const info = CAT_INFO[cat];
+  const { counts } = myStats();
+  const items = Object.entries(counts[cat] || {}).sort((a, b) => b[1] - a[1]);
+  dexShell(`
+    <div class="sm" style="margin-top:8px">食材</div>
+    <h1 class="title">${esc(cat)}</h1>
+    <p class="dexlead">${esc(info.desc)}</p>
+    <h2 class="sec">ひとこと</h2>
+    <p style="margin:0">${esc(info.tip)}</p>
+    <h2 class="sec">使った食材 <span class="sm">${items.length}種類</span></h2>
+    ${items.length ? `<div>${items.map(([n, c]) => `<span class="cchip">${esc(n)}${c > 1 ? ` <b>×${c}</b>` : ""}</span>`).join("")}</div>` : '<div class="sm">まだありません．「今日作った」を押すと，ここに増えていきます．</div>'}`);
+}
+$("dexBody").onclick = e => {
+  const rr = e.target.closest(".rrow");
+  if (rr) return openDetail(rr.dataset.id);
+  const dx = e.target.closest("[data-dx]");
+  if (!dx) return;
+  if (dx.dataset.dx === "back") { renderMap(); show("map"); }
+  if (dx.dataset.dx === "ask") { $("aCountry").value = dx.dataset.c; renderPantry(); show("ask"); }
 };
 
 /* ---------- 相談(質問文づくり) ---------- */
