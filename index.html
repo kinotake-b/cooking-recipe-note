@@ -1,0 +1,1117 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#ffffff">
+<meta name="color-scheme" content="light">
+<meta name="robots" content="noindex">
+<meta name="description" content="AIが考えたレシピを貯めて，作るほどレベルが上がる個人用レシピノート">
+<title>レシピ帳</title>
+<style>
+  /* デザインの根拠は design/surveys/recipe-apps.md
+     白地+アクセント1色/見出しだけ明朝/丸(お皿・スタンプ・輪・番号)を繰り返す */
+  :root {
+    --bg: #ffffff;
+    --soft: #f6f5f2;
+    --line: #e8e5df;
+    --ink: #262321;
+    --sub: #77716a;
+    --accent: #c93d20;
+    --tint: #fbeae5;
+    --sans: system-ui, -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+    --serif: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { color-scheme: light; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.7 var(--sans);
+    -webkit-text-size-adjust: 100%;
+  }
+  [hidden] { display: none !important; }
+  button { font: inherit; color: inherit; cursor: pointer; background: none; border: 0; padding: 0; }
+  input, textarea, select {
+    width: 100%; font: inherit; color: var(--ink);
+    background: var(--soft); border: 1px solid transparent; border-radius: 12px;
+    padding: 12px 14px; min-height: 48px;
+  }
+  textarea { resize: vertical; line-height: 1.7; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); background: var(--bg); }
+  ::placeholder { color: #aaa49b; }
+  img { display: block; }
+
+  .page { max-width: 640px; margin: 0 auto; padding: 0 16px 120px; }
+  .view { display: none; }
+  .view.on { display: block; }
+
+  /* 見出し */
+  .head { display: flex; justify-content: space-between; align-items: center; padding: 20px 0 12px; }
+  h1 { font: 600 28px/1.3 var(--serif); letter-spacing: .02em; margin: 0; }
+  h2.sec { font: 600 19px/1.4 var(--serif); margin: 32px 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .sm { font-size: 13px; color: var(--sub); }
+  .accent { color: var(--accent); }
+
+  /* ボタン */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    min-height: 48px; padding: 0 20px; border-radius: 12px;
+    background: var(--soft); font-weight: 600; transition: transform .1s;
+  }
+  .btn:active { transform: scale(.98); }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.line { background: var(--bg); color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .btn.text { background: none; color: var(--sub); font-weight: 500; padding: 0 8px; }
+  .btn.danger { background: none; color: #b3261e; font-weight: 500; }
+  .btn.block { width: 100%; }
+  .row { display: flex; gap: 8px; margin-top: 12px; }
+  .row > * { flex: 1; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+  /* レベルの輪 */
+  .ring { position: relative; width: 48px; height: 48px; display: grid; place-items: center; }
+  .ring svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .ring circle { fill: none; stroke-width: 3.5; }
+  .ring .bg { stroke: var(--line); }
+  .ring .arc { stroke: var(--accent); stroke-linecap: round; stroke-dasharray: 119.4; transition: stroke-dashoffset .6s; }
+  .ring span { font: 600 12px/1 var(--serif); }
+
+  /* 下のタブ */
+  #tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    background: rgba(255,255,255,.96); border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  #tabbar .in { max-width: 640px; margin: 0 auto; display: flex; }
+  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0 6px; font-size: 11px; color: var(--sub); }
+  .tab.on { color: var(--accent); font-weight: 600; }
+  .tab svg, .mic svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .tab.add .disc { width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; }
+  .tab.add { color: var(--ink); }
+
+  /* 一覧 */
+  .search { margin-bottom: 4px; }
+  .filters { display: flex; gap: 8px; overflow-x: auto; padding: 8px 0 12px; scrollbar-width: none; }
+  .filters::-webkit-scrollbar { display: none; }
+  .fchip { flex: none; min-height: 36px; padding: 0 14px; border-radius: 99px; background: var(--soft); font-size: 14px; }
+  .fchip.on { background: var(--ink); color: #fff; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 12px; }
+  .item { display: block; width: 100%; text-align: left; }
+  .ph { aspect-ratio: 1; border-radius: 16px; background: var(--soft); overflow: hidden; display: grid; place-items: center; }
+  .ph img { width: 100%; height: 100%; object-fit: cover; }
+  .ph span { font: 600 44px var(--serif); color: #d6d0c6; }
+  .item h3 {
+    font: 600 15px/1.5 var(--serif); margin: 8px 0 2px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .stars { letter-spacing: 1px; color: var(--ink); font-size: 13px; }
+  .stars i { font-style: normal; color: var(--line); }
+  .empty { text-align: center; padding: 56px 16px; }
+  .empty .plate { width: 88px; height: 88px; margin: 0 auto 16px; border-radius: 50%; border: 1.5px dashed var(--line); display: grid; place-items: center; }
+  .empty .plate i { width: 44px; height: 44px; border-radius: 50%; background: var(--soft); }
+  .tools { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); }
+
+  /* 詳細 */
+  .bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; min-height: 56px; }
+  .back { min-height: 44px; padding-right: 12px; color: var(--accent); font-weight: 600; }
+  .hero { margin: 0 -16px 16px; }
+  .hero img { width: 100%; max-height: 360px; aspect-ratio: 4 / 3; object-fit: cover; }
+  .title { font: 600 26px/1.4 var(--serif); margin: 0 0 6px; }
+  .tagline { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: 14px; color: var(--sub); }
+  .tagline .again { color: var(--accent); font-weight: 600; }
+  .mades { margin-top: 10px; font-size: 13px; color: var(--sub); }
+  .ing { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); min-height: 48px; cursor: pointer; }
+  .ing .amt { color: var(--sub); text-align: right; flex: none; }
+  .ing.done { color: #b5afa5; text-decoration: line-through; }
+  .ing.done .amt { color: #cfc9bf; }
+  .subhead { font-size: 13px; font-weight: 600; color: var(--accent); padding: 16px 0 4px; }
+  .steps { list-style: none; margin: 0; padding: 0; }
+  .steps li { display: flex; gap: 14px; padding: 14px 0; line-height: 1.8; }
+  .steps .n { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--tint); color: var(--accent); font: 600 15px/30px var(--serif); text-align: center; margin-top: 2px; }
+  .note { background: var(--soft); border-radius: 14px; padding: 14px 16px; white-space: pre-wrap; }
+
+  /* 編集 */
+  label.l { display: block; font-size: 13px; font-weight: 600; color: var(--sub); margin: 22px 0 6px; }
+  .labrow { display: flex; justify-content: space-between; align-items: flex-end; margin: 22px 0 6px; }
+  .labrow label.l { margin: 0; }
+  .pastebox { background: var(--tint); border-radius: 16px; padding: 16px; margin-top: 8px; }
+  .pastebox .l { margin-top: 0; color: var(--accent); }
+  .pastebox textarea { background: var(--bg); }
+  .pnote { font-size: 13px; color: var(--accent); margin-top: 8px; }
+  .photo img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 16px; margin-bottom: 8px; }
+  .star-pick { display: flex; gap: 4px; }
+  .star-pick button { width: 44px; height: 44px; font-size: 30px; line-height: 1; color: var(--line); }
+  .star-pick button.on { color: var(--ink); }
+  .check { display: flex; align-items: center; gap: 10px; min-height: 48px; margin-top: 8px; }
+  .check input { width: 22px; height: 22px; min-height: 0; accent-color: var(--accent); }
+  .savebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: rgba(255,255,255,.96); border-top: 1px solid var(--line); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
+  .savebar .btn { max-width: 608px; margin: 0 auto; display: flex; }
+
+  /* 音声入力 */
+  .mic { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 12px; border-radius: 99px; background: var(--soft); font-size: 13px; color: var(--ink); }
+  .mic svg { width: 18px; height: 18px; }
+  .mic.rec { background: var(--accent); color: #fff; }
+
+  /* 相談 */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pc { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px 0 14px; border-radius: 99px; background: var(--tint); color: var(--ink); font-size: 15px; }
+  .pc.off { background: var(--soft); color: #b5afa5; text-decoration: line-through; }
+  .pc .x { color: var(--sub); padding: 4px; text-decoration: none; }
+  .addrow { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+  .addrow input { flex: 1; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  #aOut { font-size: 14px; }
+
+  /* マップ */
+  .profile { display: flex; align-items: center; gap: 16px; }
+  .bigring { position: relative; width: 84px; height: 84px; flex: none; display: grid; place-items: center; }
+  .bigring svg { position: absolute; inset: 0; }
+  .bigring circle { fill: none; stroke-width: 5; }
+  .bigring .bg { stroke: var(--line); }
+  .bigring .arc { stroke: var(--accent); stroke-linecap: round; stroke-dasharray: 226.2; }
+  .bigring span { font: 600 26px/1 var(--serif); }
+  .ptitle { font: 600 20px/1.4 var(--serif); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); margin: 16px 0 4px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .stat { padding: 12px 0; text-align: center; }
+  .stat b { display: block; font: 600 24px/1.2 var(--serif); }
+  details { margin-top: 10px; font-size: 14px; color: var(--sub); }
+  summary { min-height: 36px; display: flex; align-items: center; cursor: pointer; }
+  details ul { margin: 0; padding-left: 20px; }
+  .meter { height: 6px; background: var(--soft); border-radius: 99px; overflow: hidden; margin: 8px 0 16px; }
+  .meter i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+  .stamps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px 4px; }
+  .stamp { text-align: center; }
+  .stamp .disc { width: 64px; height: 64px; margin: 0 auto 4px; border-radius: 50%; border: 1.5px dashed var(--line); display: grid; place-items: center; font-size: 28px; line-height: 1; }
+  .stamp .disc span { filter: grayscale(1); opacity: .3; }
+  .stamp .nm { font-size: 12px; line-height: 1.3; }
+  .stamp .ct { font-size: 12px; color: var(--sub); }
+  .stamp.saved .disc { border-color: var(--accent); }
+  .stamp.saved .disc span { opacity: .55; }
+  .stamp.cooked { cursor: pointer; }
+  .stamp.saved { cursor: pointer; }
+  .stamp.cooked .disc { border: 2px solid var(--accent); background: var(--tint); }
+  .stamp.cooked .disc span { filter: none; opacity: 1; }
+  .nextbox { background: var(--soft); border-radius: 14px; padding: 14px 16px; margin-top: 20px; font-size: 15px; }
+  .cat { padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .cat.none { opacity: .45; }
+  .cat h3 { margin: 0 0 6px; font: 600 15px var(--sans); display: flex; justify-content: space-between; }
+  .cat h3 span { font-weight: 400; color: var(--sub); font-size: 13px; }
+  .cchip { display: inline-block; background: var(--soft); border-radius: 99px; padding: 2px 12px; margin: 0 6px 6px 0; font-size: 14px; }
+  .cchip b { color: var(--accent); font-weight: 600; }
+
+  /* 調理モード */
+  #cook { position: fixed; inset: 0; z-index: 30; background: var(--bg); display: none; flex-direction: column; }
+  #cook.on { display: flex; }
+  .ck-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: calc(8px + env(safe-area-inset-top)) 8px 0 16px; }
+  .ck-top .t { min-width: 0; }
+  .ck-top b { display: block; font: 600 15px/1.4 var(--serif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ck-top .x { width: 48px; height: 48px; font-size: 24px; color: var(--sub); flex: none; }
+  .ck-prog { height: 4px; background: var(--soft); margin: 4px 16px 0; border-radius: 99px; overflow: hidden; }
+  .ck-prog i { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+  .ck-main { flex: 1; overflow: auto; padding: 24px 24px 16px; display: flex; flex-direction: column; justify-content: center; max-width: 640px; width: 100%; margin: 0 auto; }
+  .ck-near { color: #b5afa5; font-size: 15px; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ck-cur { font-size: 24px; line-height: 1.8; margin: 20px 0; }
+  .ck-num { font: 600 16px var(--serif); color: var(--accent); }
+  .ck-nav { display: flex; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); max-width: 640px; width: 100%; margin: 0 auto; }
+  .ck-nav .btn { flex: 1; min-height: 56px; font-size: 17px; }
+  .ck-nav .btn.mini { flex: none; padding: 0 16px; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--bg); border-radius: 20px 20px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,.15); padding: 16px 20px calc(20px + env(safe-area-inset-bottom)); max-height: 70%; overflow: auto; }
+
+  .toast {
+    position: fixed; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 40;
+    max-width: 480px; margin: 0 auto; text-align: center; white-space: pre-line;
+    background: var(--ink); color: #fff; border-radius: 14px; padding: 12px 16px; font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<header id="top" class="page" style="padding-bottom:0">
+  <div class="head">
+    <h1 id="pageTitle">レシピ帳</h1>
+    <button class="ring" id="lvBtn" aria-label="レベルと記録を見る">
+      <svg viewBox="0 0 48 48"><circle class="bg" cx="24" cy="24" r="19"/><circle class="arc" id="ringArc" cx="24" cy="24" r="19" transform="rotate(-90 24 24)"/></svg>
+      <span id="lvNum"></span>
+    </button>
+  </div>
+</header>
+
+<!-- 一覧 -->
+<div id="list" class="view on">
+  <div class="page" style="padding-top:0">
+    <input id="q" class="search" type="search" placeholder="料理名・材料・タグで探す" aria-label="レシピを検索">
+    <div class="filters" id="filters"></div>
+    <div id="cards"></div>
+    <div class="tools">
+      <div class="sm">データはこの端末のブラウザに保存されています．機種変更や消去に備えて，ときどきバックアップしてください．</div>
+      <div class="row">
+        <button class="btn" id="export">書き出す</button>
+        <button class="btn" id="import">読み込む</button>
+      </div>
+      <input id="file" type="file" accept="application/json" hidden>
+    </div>
+  </div>
+</div>
+
+<!-- 相談 -->
+<div id="ask" class="view">
+  <div class="page" style="padding-top:0">
+    <div class="sm">条件を入れると，AIに聞くための質問文を作ります．コピーして，Claudeなどに貼ってください．返ってきた答えは「追加」に貼ると自動で分かれます．</div>
+
+    <h2 class="sec">家にある食材</h2>
+    <div class="sm" style="margin-bottom:10px">「、」で区切ると複数まとめて追加できます．タップで「今回使う／使わない」を切り替え，✕で削除します．</div>
+    <div class="chips" id="pantryChips"></div>
+    <div class="addrow">
+      <input id="pAdd" placeholder="例:卵、豆腐、ねぎ" aria-label="食材を追加">
+      <button class="mic" data-for="pAdd"></button>
+      <button class="btn" id="pAddBtn">追加</button>
+    </div>
+
+    <h2 class="sec">今日の希望</h2>
+    <div class="labrow"><label class="l" for="aHave">特に使いたい食材・食べたいもの</label><button class="mic" data-for="aHave"></button></div>
+    <textarea id="aHave" rows="2" placeholder="例:鶏むね肉，キャベツ，あと辛いもの"></textarea>
+
+    <label class="l" for="aCountry">国・地域</label>
+    <select id="aCountry"></select>
+    <div class="row"><button class="btn" id="aUnmade">まだ作っていない国から選ぶ</button></div>
+
+    <div class="two">
+      <div><label class="l" for="aServ">人数</label><select id="aServ"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>
+      <div><label class="l" for="aTime">調理時間</label>
+        <select id="aTime"><option value="">こだわらない</option><option>15分以内</option><option>30分以内</option><option>1時間以内</option></select></div>
+    </div>
+
+    <div class="labrow"><label class="l" for="aAvoid">苦手・避けたいもの</label><button class="mic" data-for="aAvoid"></button></div>
+    <input id="aAvoid" placeholder="例:パクチー，揚げ物">
+
+    <div class="labrow"><label class="l" for="aMore">その他の希望</label><button class="mic" data-for="aMore"></button></div>
+    <textarea id="aMore" rows="2" placeholder="例:フライパン1つで，お弁当にも使えるように"></textarea>
+
+    <div class="check"><input type="checkbox" id="aLikes" checked><label for="aLikes">好みも伝える(★4以上の料理名を入れる)</label></div>
+
+    <div class="row"><button class="btn primary" id="aBuild">質問文を作る</button></div>
+
+    <div id="aResult" hidden>
+      <h2 class="sec">できた質問文</h2>
+      <textarea id="aOut" rows="14" readonly></textarea>
+      <div class="row">
+        <button class="btn primary" id="aCopy">コピー</button>
+        <button class="btn line" id="aToAdd">答えを貼りに行く</button>
+      </div>
+      <div class="pnote" id="aNote"></div>
+    </div>
+  </div>
+</div>
+
+<!-- マップ -->
+<div id="map" class="view"><div class="page" style="padding-top:0" id="mapBody"></div></div>
+
+<!-- 詳細 -->
+<div id="detail" class="view"><div class="page" id="detailBody"></div></div>
+
+<!-- 編集 -->
+<div id="edit" class="view">
+  <div class="page">
+    <div class="bar"><button class="back" id="cancel">‹ もどる</button></div>
+
+    <div class="pastebox">
+      <label class="l" for="fPaste">AIの回答をここに貼り付け</label>
+      <textarea id="fPaste" rows="5" placeholder="貼り付けると，料理名・材料・作り方・保存方法に自動で分けます"></textarea>
+      <div class="row"><button class="btn line" id="parse">もう一度，自動で分ける</button></div>
+      <div class="pnote" id="parseNote"></div>
+    </div>
+
+    <label class="l" for="fTitle">料理名</label>
+    <input id="fTitle" placeholder="例:鶏むねの味噌マヨ焼き">
+    <label class="l" for="fCountry">国・地域</label>
+    <select id="fCountry"></select>
+    <label class="l" for="fIngredients">材料</label>
+    <textarea id="fIngredients" rows="6"></textarea>
+    <label class="l" for="fSteps">作り方</label>
+    <textarea id="fSteps" rows="8"></textarea>
+    <label class="l" for="fStorage">保存方法</label>
+    <textarea id="fStorage" rows="2"></textarea>
+    <label class="l" for="fExtra">ポイント・アレンジ</label>
+    <textarea id="fExtra" rows="3"></textarea>
+    <div class="labrow"><label class="l" for="fMemo">作ってみたメモ(味・調整したいところ)</label><button class="mic" data-for="fMemo"></button></div>
+    <textarea id="fMemo" rows="3"></textarea>
+    <label class="l" for="fTags">タグ(スペースかカンマで区切る)</label>
+    <input id="fTags" placeholder="時短 鶏肉">
+
+    <label class="l">写真</label>
+    <div class="photo">
+      <img id="fPhotoPreview" alt="" hidden>
+      <div class="row" style="margin-top:0">
+        <button class="btn" id="photoBtn">写真を選ぶ・撮る</button>
+        <button class="btn danger" id="photoDel" hidden>写真を消す</button>
+      </div>
+    </div>
+    <input id="fPhoto" type="file" accept="image/*" hidden>
+
+    <label class="l">評価</label>
+    <div class="star-pick" id="fStars"></div>
+    <div class="check"><input type="checkbox" id="fAgain"><label for="fAgain">また作りたい</label></div>
+  </div>
+  <div class="savebar"><button class="btn primary block" id="save">保存</button></div>
+</div>
+
+<!-- 調理モード -->
+<div id="cook"></div>
+
+<nav id="tabbar" aria-label="メニュー"><div class="in">
+  <button class="tab on" id="tabList"><svg viewBox="0 0 24 24"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v15H5.5C4.7 19 4 18.3 4 17.5zM20 5.5c0-.8-.7-1.5-1.5-1.5H13v15h5.5c.8 0 1.5-.7 1.5-1.5z"/></svg>レシピ</button>
+  <button class="tab" id="tabAsk"><svg viewBox="0 0 24 24"><path d="M5 5h14a1 1 0 011 1v9a1 1 0 01-1 1h-8l-4 3.5V16H5a1 1 0 01-1-1V6a1 1 0 011-1z"/></svg>相談</button>
+  <button class="tab add" id="tabAdd" aria-label="レシピを追加"><span class="disc"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></button>
+  <button class="tab" id="tabMap"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/></svg>マップ</button>
+</div></nav>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+const KEY = "recipe-app-v1";
+
+/* ---------- 国・地域(世界の料理マップ) ---------- */
+const CUISINES = [
+  ["日本", "🇯🇵", ["和食", "味噌汁", "肉じゃが", "照り焼き", "丼", "煮物", "天ぷら", "お浸し", "親子", "きんぴら", "生姜焼き"]],
+  ["中国", "🇨🇳", ["中華", "麻婆", "餃子", "チャーハン", "青椒肉絲", "回鍋肉", "春巻", "八宝菜", "エビチリ", "酢豚", "炒飯"]],
+  ["韓国", "🇰🇷", ["韓国", "キムチ", "ビビンバ", "チヂミ", "プルコギ", "サムギョプサル", "コチュジャン", "トッポギ", "スンドゥブ", "チゲ"]],
+  ["台湾", "🇹🇼", ["台湾", "魯肉飯", "ルーロー"]],
+  ["タイ", "🇹🇭", ["タイ料理", "ガパオ", "トムヤム", "パッタイ", "グリーンカレー", "ナンプラー"]],
+  ["ベトナム", "🇻🇳", ["ベトナム", "フォー", "生春巻", "バインミー"]],
+  ["フィリピン", "🇵🇭", ["フィリピン", "アドボ"]],
+  ["インドネシア", "🇮🇩", ["インドネシア", "ナシゴレン", "ミーゴレン", "サテ"]],
+  ["マレーシア", "🇲🇾", ["ラクサ", "海南鶏飯", "シンガポール", "マレーシア"]],
+  ["インド", "🇮🇳", ["インド", "ナン", "タンドリー", "ビリヤニ", "ダール", "マサラ", "サグ"]],
+  ["トルコ", "🇹🇷", ["トルコ", "ケバブ", "ドルマ"]],
+  ["中東", "🇱🇧", ["中東", "フムス", "ファラフェル", "シャクシュカ", "レバノン", "イスラエル"]],
+  ["モロッコ", "🇲🇦", ["モロッコ", "タジン", "クスクス", "チュニジア"]],
+  ["アフリカ", "🌍", ["アフリカ", "ジョロフ", "エチオピア", "ナイジェリア"]],
+  ["ジョージア", "🇬🇪", ["ジョージア", "ハチャプリ", "シュクメルリ"]],
+  ["ギリシャ", "🇬🇷", ["ギリシャ", "ムサカ", "ギロ", "ツァジキ"]],
+  ["イタリア", "🇮🇹", ["イタリア", "パスタ", "リゾット", "カルボナーラ", "ボロネーゼ", "ピザ", "ペペロンチーノ", "ニョッキ", "ラザニア", "カプレーゼ"]],
+  ["フランス", "🇫🇷", ["フランス", "ラタトゥイユ", "ポトフ", "キッシュ", "ブッフ", "ビーフシチュー", "ポワレ", "ブイヤベース"]],
+  ["スペイン", "🇪🇸", ["スペイン", "アヒージョ", "パエリア", "トルティーヤ", "ガスパチョ"]],
+  ["ポルトガル", "🇵🇹", ["ポルトガル", "バカラオ"]],
+  ["ドイツ", "🇩🇪", ["ドイツ", "シュニッツェル", "ジャーマンポテト", "ザワークラウト"]],
+  ["イギリス", "🇬🇧", ["イギリス", "フィッシュ&チップス", "シェパーズパイ"]],
+  ["北欧", "🇸🇪", ["北欧", "スウェーデン", "ノルウェー", "デンマーク", "フィンランド"]],
+  ["ロシア・東欧", "🇷🇺", ["ロシア", "ボルシチ", "ストロガノフ", "ピロシキ", "ポーランド", "ハンガリー", "グヤーシュ"]],
+  ["アメリカ", "🇺🇸", ["アメリカ", "ハンバーガー", "BBQ", "バーベキュー", "クラムチャウダー", "マカロニ&チーズ", "ケイジャン"]],
+  ["メキシコ", "🇲🇽", ["メキシコ", "タコス", "ブリトー", "ワカモレ", "チリコンカン", "ファヒータ", "サルサ"]],
+  ["ペルー", "🇵🇪", ["ペルー", "セビーチェ"]],
+  ["ブラジル", "🇧🇷", ["ブラジル", "フェイジョアーダ"]],
+  ["その他", "🌐", []],
+];
+const FLAG = Object.fromEntries(CUISINES.map(c => [c[0], c[1]]));
+
+function guessCountry(title, text) {
+  let best = "", top = 0;
+  for (const [name, , words] of CUISINES) {
+    let s = 0;
+    for (const w of words) {
+      if ((title || "").includes(w)) s += 3;
+      if ((text || "").includes(w)) s += 1;
+    }
+    if (s > top) { top = s; best = name; }
+  }
+  return best;
+}
+
+/* ---------- AIの回答を分ける ---------- */
+const SECTION = /^(材料|食材|作り方|つくり方|手順|レシピ|調理方法|保存方法|保存|保管方法|保管|日持ち|ポイント|コツ|ワンポイント|アレンジ|栄養)\s*(?:[（(][^）)]*[）)])?\s*[】\]」』]?\s*(?:[:：]\s*(.*))?$/;
+const SECTION_KEY = {
+  材料: "ingredients", 食材: "ingredients",
+  作り方: "steps", つくり方: "steps", 手順: "steps", レシピ: "steps", 調理方法: "steps",
+  保存方法: "storage", 保存: "storage", 保管方法: "storage", 保管: "storage", 日持ち: "storage",
+  ポイント: "extra", コツ: "extra", ワンポイント: "extra", アレンジ: "extra", 栄養: "extra",
+};
+const stripMark = s => s.replace(/\*\*/g, "").replace(/^[\s>#*\-■□●○◆◇▼▽◎【『「\[]+/, "").trim();
+
+function parseRecipe(text) {
+  const out = { title: "", ingredients: "", steps: "", storage: "", extra: "", found: [] };
+  const buf = { ingredients: [], steps: [], storage: [], extra: [] };
+  const pre = [];
+  let cur = null, any = false;
+  for (const raw of text.replace(/\r/g, "").split("\n")) {
+    const line = raw.trim();
+    if (!line) { if (cur) buf[cur].push(""); continue; }
+    const c = stripMark(line);
+    const m = c.match(SECTION);
+    if (m) {
+      cur = SECTION_KEY[m[1]]; any = true;
+      if (m[2]) buf[cur].push(m[2]);
+      continue;
+    }
+    const t = c.match(/^(?:料理名|メニュー|タイトル)\s*[:：]\s*(.+)$/);
+    if (t && !out.title) { out.title = t[1].trim(); continue; }
+    if (cur) buf[cur].push(raw.replace(/\*\*/g, "").trimEnd());
+    else pre.push(line);
+  }
+  if (!out.title) {
+    const cand =
+      pre.find(l => /^#{1,4}\s/.test(l)) ||
+      pre.find(l => /^【.+】$/.test(l)) ||
+      pre.find(l => l.length <= 30 && !/[。！!？?]$/.test(l) && !/^(はい|了解|もちろん|承知|わかりました|以下)/.test(l));
+    if (cand) out.title = stripMark(cand).replace(/[】』」\]]+$/, "");
+  }
+  if (!any) {
+    buf.steps = pre.filter(l => stripMark(l) !== out.title).map(l => l.replace(/\*\*/g, ""));
+  }
+  for (const k of Object.keys(buf)) {
+    out[k] = buf[k].join("\n").replace(/\n{3,}/g, "\n\n").trim();
+    if (out[k]) out.found.push(k);
+  }
+  return out;
+}
+
+/* 表示用:材料を「名前/分量」の行に,作り方を手順の配列に分ける */
+function ingredientRows(text) {
+  const rows = [];
+  for (const seg of (text || "").split(/\n|[、，]/)) {
+    let s = seg.replace(/\*\*/g, "").replace(/^[\s・\-*•●○■□]+/, "").trim();
+    if (!s) continue;
+    if (/^[【\[■▼].*[】\]]$/.test(s) || /[:：]$/.test(s)) { rows.push({ head: s.replace(/[【】\[\]■▼:：]/g, "") }); continue; }
+    s = s.replace(/^[A-ZＡ-Ｚ][\s　.．:：)）]+/, "");
+    let m = s.match(/^(.+?)[\s　]+((?:大さじ|小さじ|約|少々|適量|少し|お好み|ひとつまみ|\d|[０-９]|半|ひとかけ).*)$/);
+    if (!m) m = s.match(/^([^\d０-９]+?)([\d０-９].*)$/);
+    rows.push(m ? { name: m[1].trim(), amount: m[2].trim() } : { name: s, amount: "" });
+  }
+  return rows;
+}
+function parseSteps(text) {
+  const num = /^(?:\d+\s*[.．、)）]|[（(]\d+[)）]|[①-⑳])\s*(.*)$/;
+  const lines = (text || "").split("\n").map(l => l.trim()).filter(Boolean);
+  const numbered = lines.some(l => num.test(l));
+  const steps = [];
+  for (const l of lines) {
+    const m = l.match(num);
+    if (m) { if (m[1]) steps.push(m[1]); }
+    else if (numbered && steps.length) steps[steps.length - 1] += " " + l;
+    else steps.push(l);
+  }
+  return steps;
+}
+
+/* ---------- 食材マップ ---------- */
+const CATS = [
+  ["豆・大豆", ["豆腐", "納豆", "油揚げ", "厚揚げ", "豆乳", "大豆", "ひよこ豆", "レンズ豆", "黒豆", "いんげん", "きな粉"]],
+  ["調味料", ["醤油", "しょうゆ", "味噌", "みそ", "塩", "砂糖", "みりん", "酒", "酢", "油", "こしょう", "胡椒", "だし", "出汁", "ソース", "マヨ", "ケチャップ", "コチュジャン", "ごま", "スープの素", "鶏がら", "コンソメ", "ブイヨン", "片栗粉", "小麦粉", "カレー粉", "ルウ", "はちみつ", "豆板醤", "甜麺醤", "オイスター", "ポン酢", "めんつゆ", "ナンプラー", "スパイス", "クミン", "水", "唐辛子", "山椒"]],
+  ["卵・乳", ["卵", "たまご", "玉子", "牛乳", "チーズ", "バター", "ヨーグルト", "クリーム", "マーガリン"]],
+  ["肉", ["鶏", "豚", "牛", "肉", "ベーコン", "ハム", "ソーセージ", "ウインナー", "ラム", "ささみ", "手羽", "レバー"]],
+  ["魚介", ["魚", "鮭", "さけ", "さば", "鯖", "ぶり", "鰤", "たら", "鱈", "あじ", "鯵", "いわし", "鰯", "まぐろ", "ツナ", "えび", "海老", "エビ", "いか", "イカ", "たこ", "タコ", "あさり", "しじみ", "ホタテ", "帆立", "かに", "カニ", "ちくわ", "かまぼこ", "はんぺん", "しらす", "明太子", "鯛", "さんま", "秋刀魚", "牡蠣", "貝"]],
+  ["きのこ", ["しいたけ", "椎茸", "しめじ", "えのき", "まいたけ", "舞茸", "エリンギ", "きのこ", "キノコ", "マッシュルーム", "なめこ"]],
+  ["野菜", ["ねぎ", "ネギ", "にんじん", "人参", "じゃがいも", "ジャガイモ", "大根", "キャベツ", "白菜", "レタス", "トマト", "きゅうり", "なす", "茄子", "ピーマン", "パプリカ", "ほうれん草", "ブロッコリー", "カリフラワー", "かぼちゃ", "南瓜", "ごぼう", "れんこん", "もやし", "ニラ", "にら", "にんにく", "ニンニク", "しょうが", "生姜", "セロリ", "アスパラ", "オクラ", "ズッキーニ", "コーン", "とうもろこし", "かぶ", "しそ", "大葉", "パセリ", "バジル", "パクチー", "香菜", "わかめ", "昆布", "海苔", "のり", "ひじき", "菜", "芋", "いも", "瓜", "枝豆", "ししとう"]],
+  ["穀物・麺", ["米", "ご飯", "ごはん", "パスタ", "スパゲッティ", "うどん", "そば", "そうめん", "麺", "パン", "餅", "もち", "オートミール", "春雨", "ライス", "マカロニ", "ペンネ", "皮"]],
+  ["果物", ["りんご", "バナナ", "レモン", "みかん", "オレンジ", "いちご", "ぶどう", "キウイ", "パイナップル", "桃", "梨", "柿", "アボカド", "ゆず", "柚子", "すだち", "ライム", "マンゴー"]],
+];
+const CAT_ORDER = ["肉", "魚介", "野菜", "きのこ", "卵・乳", "豆・大豆", "穀物・麺", "果物", "調味料", "その他"];
+
+function categorize(name) {
+  for (const [cat, words] of CATS) if (words.some(w => name.includes(w))) return cat;
+  return "その他";
+}
+function ingredientNames(text) {
+  const names = [];
+  for (const l of (text || "").split(/\n|[、，]/)) {
+    let s = l.replace(/\*\*/g, "").replace(/^[\s・\-*•●○■□\d.)）]+/, "").trim();
+    if (!s || /^[【\[■▼].*[】\]]$/.test(s) || /[:：]$/.test(s)) continue;
+    s = s.replace(/^[A-ZＡ-Ｚ][\s　.．:：)）]+/, "").replace(/^[（(][^）)]*[）)]\s*/, "");
+    const name = s.split(/[\s　:：…（(\d０-９]|大さじ|小さじ|適量|少々|各/)[0].trim();
+    if (name && name.length <= 12 && !names.includes(name)) names.push(name);
+  }
+  return names;
+}
+
+/* ---------- データ ---------- */
+function normalize(r) {
+  r = { title: "", body: "", ingredients: "", steps: "", storage: "", extra: "", memo: "", country: "", photo: "", tags: [], made: [], lastMade: "", rating: 0, again: false, ...r };
+  if (r.body && !r.ingredients && !r.steps && !r.storage) {   // 以前の形式のレシピを分け直す
+    const p = parseRecipe(r.body);
+    r.ingredients = p.ingredients; r.steps = p.steps; r.storage = p.storage; r.extra = p.extra;
+    if (!r.country) r.country = guessCountry(r.title, r.body);
+  }
+  r.body = "";
+  return r;
+}
+function load() {
+  try { return (JSON.parse(localStorage.getItem(KEY)) || []).map(normalize); } catch { return []; }
+}
+let recipes = load();
+let current = null;     // 編集中・表示中のID
+let rating = 0;
+let photo = "";
+let filter = "all";
+let view = "list";
+
+function persist() {
+  try { localStorage.setItem(KEY, JSON.stringify(recipes)); return true; }
+  catch { alert("保存できませんでした．写真が多すぎるかもしれません．バックアップを書き出してから，古い写真を消してください．"); return false; }
+}
+const $ = id => document.getElementById(id);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const today = () => new Date().toLocaleDateString("sv-SE");
+const stars = n => `<span class="stars" aria-label="評価 ${n}">${"★".repeat(n)}<i>${"★".repeat(5 - n)}</i></span>`;
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const MIC = '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21"/></svg><span>話す</span>';
+
+const TITLES_BY_VIEW = { list: "レシピ帳", ask: "相談", map: "マップ" };
+function show(name) {
+  view = name;
+  stopDictation();
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === name));
+  const main = name in TITLES_BY_VIEW;
+  $("top").hidden = !main;
+  $("tabbar").hidden = !main;
+  if (main) $("pageTitle").textContent = TITLES_BY_VIEW[name];
+  $("tabList").classList.toggle("on", name === "list");
+  $("tabAsk").classList.toggle("on", name === "ask");
+  $("tabMap").classList.toggle("on", name === "map");
+  updateBadge();
+  window.scrollTo(0, 0);
+}
+$("tabList").onclick = () => { renderList(); show("list"); };
+$("tabAsk").onclick = () => { renderPantry(); show("ask"); };
+$("tabMap").onclick = () => { renderMap(); show("map"); };
+$("tabAdd").onclick = () => openEdit(null);
+$("lvBtn").onclick = () => { renderMap(); show("map"); };
+
+/* ---------- 食材庫・レベル・XP ---------- */
+const META_KEY = "recipe-app-meta-v1";
+function loadMeta() {
+  const base = { pantry: [], xp: 0, log: [] };
+  try { return { ...base, ...JSON.parse(localStorage.getItem(META_KEY)) }; } catch { return base; }
+}
+let meta = loadMeta();
+function persistMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch { /* 保存できない環境では何もしない */ } }
+
+const TITLES = ["はじめの一歩", "台所の見習い", "家庭料理人", "味見の達人", "腕の立つ料理人", "食卓の主役", "一品の匠", "世界の料理人", "厨房の達人", "伝説のシェフ"];
+const need = L => 50 * L * (L - 1);                       // Lv.Lになるのに必要なXP
+const levelOf = xp => { let L = 1; while (xp >= need(L + 1)) L++; return L; };
+const titleOf = L => TITLES[Math.min(L, TITLES.length) - 1];
+const XP_RULES = ["レシピを保存 +10", "今日作った +30", "初めての国・地域の料理を作った +50", "初めて使う食材 1種ごとに +3", "写真をつけた +5", "感想メモを書いた +5"];
+
+let toastTimer;
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 3500);
+}
+function levelRatio() {
+  const L = levelOf(meta.xp), lo = need(L), hi = need(L + 1);
+  return (meta.xp - lo) / (hi - lo);
+}
+function updateBadge() {
+  $("lvNum").textContent = `Lv.${levelOf(meta.xp)}`;
+  $("ringArc").style.strokeDashoffset = 119.4 * (1 - levelRatio());
+}
+function gain(items) {
+  const sum = items.reduce((n, i) => n + i[0], 0);
+  if (!sum) return;
+  const before = levelOf(meta.xp);
+  meta.xp += sum;
+  for (const [p, why] of items) meta.log.unshift({ d: today(), p, why });
+  meta.log = meta.log.slice(0, 30);
+  persistMeta();
+  const after = levelOf(meta.xp);
+  toast(`+${sum} XP(${items.map(i => `${i[1]} +${i[0]}`).join("／")})` + (after > before ? `\nレベルアップ! Lv.${after} ${titleOf(after)}` : ""));
+  updateBadge();
+}
+function streak() {
+  const days = new Set(recipes.flatMap(r => r.made));
+  const d = new Date();
+  if (!days.has(d.toLocaleDateString("sv-SE"))) d.setDate(d.getDate() - 1);   // 今日まだ作っていなくても昨日までの連続は数える
+  let n = 0;
+  while (days.has(d.toLocaleDateString("sv-SE"))) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+
+/* 「今日作った」を記録してXPを付ける(詳細画面と調理モードの両方から使う) */
+function markMade(r) {
+  if (r.made.includes(today())) return;
+  const items = [[30, "今日作った"]];
+  const cooked = recipes.filter(x => x.made.length);
+  if (r.country && !cooked.some(x => x.country === r.country)) items.push([50, `初めての${r.country}料理`]);
+  const known = new Set(cooked.flatMap(x => ingredientNames(x.ingredients)));
+  const fresh = ingredientNames(r.ingredients).filter(n => !known.has(n)).slice(0, 10);
+  if (fresh.length) items.push([fresh.length * 3, `新しい食材${fresh.length}種`]);
+  r.made.push(today());
+  r.lastMade = today();
+  persist();
+  gain(items);
+}
+
+/* ---------- 一覧 ---------- */
+function renderFilters() {
+  const tags = [...new Set(recipes.flatMap(r => r.tags))].sort();
+  const items = [["all", "すべて"], ["again", "また作る"], ["top", "★4以上"]];
+  if (filter.startsWith("country:")) {
+    const c = filter.slice(8);
+    items.push([filter, `${FLAG[c] || ""} ${c} ✕`]);
+  }
+  items.push(...tags.map(t => ["tag:" + t, t]));
+  $("filters").innerHTML = items
+    .map(([k, label]) => `<button class="fchip ${filter === k ? "on" : ""}" data-k="${esc(k)}">${esc(label)}</button>`)
+    .join("");
+}
+function matches(r) {
+  const q = $("q").value.trim().toLowerCase();
+  const hay = [r.title, r.ingredients, r.steps, r.storage, r.extra, r.memo, r.country, r.tags.join(" ")].join(" ").toLowerCase();
+  if (q && !hay.includes(q)) return false;
+  if (filter === "again") return r.again;
+  if (filter === "top") return r.rating >= 4;
+  if (filter.startsWith("tag:")) return r.tags.includes(filter.slice(4));
+  if (filter.startsWith("country:")) return r.country === filter.slice(8);
+  return true;
+}
+function renderList() {
+  renderFilters();
+  const rows = recipes.filter(matches).sort((a, b) => (b.lastMade || "").localeCompare(a.lastMade || "") || b.id.localeCompare(a.id));
+  if (!rows.length) {
+    $("cards").innerHTML = recipes.length
+      ? `<div class="empty"><div class="sm">見つかりませんでした</div></div>`
+      : `<div class="empty"><div class="plate"><i></i></div>
+          <div style="font:600 18px var(--serif)">まだレシピがありません</div>
+          <p class="sm" style="margin:8px 0 20px">AIが考えたレシピを貼り付けると，<br>料理名・材料・作り方に自動で分かれます．</p>
+          <button class="btn primary" data-act="add">最初のレシピを追加</button></div>`;
+    return;
+  }
+  $("cards").innerHTML = `<div class="grid">${rows.map(r => `
+    <button class="item" data-id="${r.id}">
+      <div class="ph">${r.photo ? `<img src="${r.photo}" alt="">` : `<span>${esc([...r.title][0] || "")}</span>`}</div>
+      <h3>${esc(r.title)}</h3>
+      <div class="sm">${r.country ? `${FLAG[r.country] || ""} ${esc(r.country)} ・ ` : ""}${r.made.length ? `${r.made.length}回作った` : "気になる"}</div>
+      <div>${r.rating ? stars(r.rating) : ""}${r.again ? ' <span class="sm accent" style="font-weight:600">また作る</span>' : ""}</div>
+    </button>`).join("")}</div>`;
+}
+$("q").oninput = renderList;
+$("filters").onclick = e => {
+  const k = e.target.dataset.k;
+  if (k) { filter = k; renderList(); }
+};
+$("cards").onclick = e => {
+  if (e.target.closest("[data-act=add]")) return openEdit(null);
+  const c = e.target.closest(".item");
+  if (c) openDetail(c.dataset.id);
+};
+
+/* ---------- 詳細 ---------- */
+function openDetail(id) {
+  current = id;
+  const r = recipes.find(x => x.id === id);
+  const ing = ingredientRows(r.ingredients);
+  const steps = parseSteps(r.steps);
+  $("detailBody").innerHTML = `
+    <div class="bar"><button class="back" id="toList">‹ 一覧</button><button class="btn text" id="toEdit">編集</button></div>
+    ${r.photo ? `<div class="hero"><img src="${r.photo}" alt=""></div>` : ""}
+    <h1 class="title">${esc(r.title)}</h1>
+    <div class="tagline">
+      ${r.country ? `<span>${FLAG[r.country] || ""} ${esc(r.country)}</span>` : ""}
+      ${r.rating ? stars(r.rating) : ""}
+      ${r.again ? '<span class="again">また作りたい</span>' : ""}
+      ${r.tags.map(t => `<span>#${esc(t)}</span>`).join("")}
+    </div>
+    <div class="row" style="margin-top:16px">
+      ${steps.length ? '<button class="btn primary" id="cookBtn">調理モード</button>' : ""}
+      <button class="btn line" id="made">${r.made.includes(today()) ? "今日作った ✓" : "今日作った"}</button>
+    </div>
+    <div class="mades">${r.made.length ? `作った記録:${r.made.slice().reverse().join(" / ")}` : "まだ作っていません"}</div>
+    ${r.memo ? `<h2 class="sec">メモ</h2><div class="note">${esc(r.memo)}</div>` : ""}
+    ${ing.length ? `<h2 class="sec">材料</h2><div class="sm" style="margin:-4px 0 4px">タップでチェックできます</div>${ing.map(i => i.head
+      ? `<div class="subhead">${esc(i.head)}</div>`
+      : `<div class="ing"><span>${esc(i.name)}</span><span class="amt">${esc(i.amount)}</span></div>`).join("")}` : ""}
+    ${steps.length ? `<h2 class="sec">作り方</h2><ol class="steps">${steps.map((s, i) => `<li><span class="n">${i + 1}</span><span>${esc(s)}</span></li>`).join("")}</ol>` : ""}
+    ${r.storage ? `<h2 class="sec">保存方法</h2><div class="note">${esc(r.storage)}</div>` : ""}
+    ${r.extra ? `<h2 class="sec">ポイント・アレンジ</h2><div class="note">${esc(r.extra)}</div>` : ""}
+    <div style="margin-top:40px"><button class="btn danger" id="del">このレシピを削除</button></div>`;
+  show("detail");
+}
+$("detailBody").onclick = e => {
+  const id = e.target.id;
+  const r = recipes.find(x => x.id === current);
+  const ing = e.target.closest(".ing");
+  if (ing) ing.classList.toggle("done");
+  if (id === "toList") { renderList(); show("list"); }
+  if (id === "toEdit") openEdit(current);
+  if (id === "cookBtn") openCook(r);
+  if (id === "made") { markMade(r); openDetail(current); }
+  if (id === "del" && confirm(`「${r.title}」を削除します．よろしいですか?`)) {
+    recipes = recipes.filter(x => x.id !== current);
+    persist(); renderList(); show("list");
+  }
+};
+
+/* ---------- 調理モード ---------- */
+let cookRecipe = null, cookSteps = [], cookI = 0, cookSheet = false, wake = null;
+async function lockScreen() { try { wake = await navigator.wakeLock?.request("screen"); } catch { /* 画面を消さない機能が使えない端末では何もしない */ } }
+function unlockScreen() { try { wake?.release(); } catch { /* 解除に失敗しても支障なし */ } wake = null; }
+document.addEventListener("visibilitychange", () => { if (cookRecipe && document.visibilityState === "visible") lockScreen(); });
+
+function openCook(r) {
+  cookRecipe = r; cookSteps = parseSteps(r.steps); cookI = 0; cookSheet = false;
+  lockScreen();
+  renderCook();
+  $("top").hidden = true; $("tabbar").hidden = true;
+  $("cook").classList.add("on");
+}
+function closeCook() {
+  cookRecipe = null;
+  unlockScreen();
+  $("cook").classList.remove("on");
+}
+function renderCook() {
+  const n = cookSteps.length, last = cookI === n - 1;
+  const ing = ingredientRows(cookRecipe.ingredients);
+  $("cook").innerHTML = `
+    <div class="ck-top">
+      <div class="t"><b>${esc(cookRecipe.title)}</b><span class="sm">手順 ${cookI + 1} / ${n}</span></div>
+      <button class="x" data-ck="close" aria-label="調理モードを閉じる">✕</button>
+    </div>
+    <div class="ck-prog"><i style="width:${(cookI + 1) / n * 100}%"></i></div>
+    <div class="ck-main">
+      ${cookI > 0 ? `<div class="ck-near">${esc(cookSteps[cookI - 1])}</div>` : ""}
+      <div class="ck-cur"><span class="ck-num">${cookI + 1}</span><br>${esc(cookSteps[cookI])}</div>
+      ${!last ? `<div class="ck-near">${esc(cookSteps[cookI + 1])}</div>` : ""}
+    </div>
+    <div class="ck-nav">
+      <button class="btn mini" data-ck="ing">材料</button>
+      <button class="btn" data-ck="prev" ${cookI === 0 ? "disabled style='opacity:.4'" : ""}>‹ 前へ</button>
+      ${last ? '<button class="btn primary" data-ck="done">できた!</button>' : '<button class="btn primary" data-ck="next">次へ ›</button>'}
+    </div>
+    ${cookSheet ? `<div class="sheet"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font:600 17px var(--serif)">材料</b><button class="btn text" data-ck="ing">閉じる</button></div>
+      ${ing.map(i => i.head ? `<div class="subhead">${esc(i.head)}</div>` : `<div class="ing"><span>${esc(i.name)}</span><span class="amt">${esc(i.amount)}</span></div>`).join("")}</div>` : ""}`;
+}
+$("cook").onclick = e => {
+  const ing = e.target.closest(".sheet .ing");
+  if (ing) { ing.classList.toggle("done"); return; }
+  const k = e.target.closest("[data-ck]")?.dataset.ck;
+  if (!k) return;
+  if (k === "close") { closeCook(); show("detail"); return; }
+  if (k === "next" && cookI < cookSteps.length - 1) cookI++;
+  if (k === "prev" && cookI > 0) cookI--;
+  if (k === "ing") cookSheet = !cookSheet;
+  if (k === "done") { const r = cookRecipe; closeCook(); markMade(r); openDetail(r.id); return; }
+  renderCook();
+};
+
+/* ---------- 追加・編集 ---------- */
+$("fCountry").innerHTML = `<option value="">未設定</option>` + CUISINES.map(c => `<option value="${c[0]}">${c[1]} ${c[0]}</option>`).join("");
+
+function drawStars() {
+  $("fStars").innerHTML = [1, 2, 3, 4, 5].map(n => `<button data-n="${n}" class="${n <= rating ? "on" : ""}" aria-label="星${n}">★</button>`).join("");
+}
+$("fStars").onclick = e => {
+  const n = +e.target.dataset.n;
+  if (n) { rating = rating === n ? 0 : n; drawStars(); }
+};
+function drawPhoto() {
+  $("fPhotoPreview").hidden = !photo;
+  $("fPhotoPreview").src = photo || "";
+  $("photoDel").hidden = !photo;
+}
+function openEdit(id) {
+  current = id;
+  const r = id ? recipes.find(x => x.id === id) : normalize({});
+  $("fPaste").value = "";
+  $("parseNote").textContent = "";
+  $("fTitle").value = r.title;
+  $("fCountry").value = r.country;
+  $("fIngredients").value = r.ingredients;
+  $("fSteps").value = r.steps;
+  $("fStorage").value = r.storage;
+  $("fExtra").value = r.extra;
+  $("fMemo").value = r.memo;
+  $("fTags").value = r.tags.join(" ");
+  $("fAgain").checked = r.again;
+  rating = r.rating;
+  photo = r.photo;
+  drawStars(); drawPhoto();
+  show("edit");
+}
+
+const PART_NAME = { ingredients: "材料", steps: "作り方", storage: "保存方法", extra: "ポイント" };
+function applyParse() {
+  const text = $("fPaste").value;
+  if (!text.trim()) return;
+  const p = parseRecipe(text);
+  if (p.title) $("fTitle").value = p.title;
+  $("fIngredients").value = p.ingredients;
+  $("fSteps").value = p.steps;
+  $("fStorage").value = p.storage;
+  $("fExtra").value = p.extra;
+  const guess = guessCountry(p.title, text);
+  if (guess) $("fCountry").value = guess;
+  const found = (p.title ? ["料理名"] : []).concat(p.found.map(k => PART_NAME[k]));
+  const missing = ["料理名", "材料", "作り方", "保存方法"].filter(n => !found.includes(n));
+  $("parseNote").textContent =
+    `分けました:${found.join("・") || "なし"}` +
+    (missing.length ? `／見つからなかった項目:${missing.join("・")}` : "") +
+    (guess ? `／国・地域は「${guess}」と推測` : "") +
+    "．ずれていたら下の欄で直せます．";
+}
+$("fPaste").addEventListener("paste", () => setTimeout(applyParse, 0));
+$("parse").onclick = applyParse;
+
+function resizeImage(file, max = 720) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const s = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * s);
+      c.height = Math.round(img.height * s);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL("image/jpeg", 0.7));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+$("photoBtn").onclick = () => $("fPhoto").click();
+$("fPhoto").onchange = async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try { photo = await resizeImage(f); drawPhoto(); }
+  catch { alert("写真を読み込めませんでした．"); }
+  e.target.value = "";
+};
+$("photoDel").onclick = () => { photo = ""; drawPhoto(); };
+
+$("cancel").onclick = () => current ? openDetail(current) : (renderList(), show("list"));
+$("save").onclick = () => {
+  let title = $("fTitle").value.trim();
+  const steps = $("fSteps").value.trim();
+  if (!title && steps) title = steps.split("\n")[0].slice(0, 40);
+  if (!title) { alert("料理名か作り方を入力してください．"); return; }
+  const data = {
+    title, steps, photo, rating,
+    country: $("fCountry").value,
+    ingredients: $("fIngredients").value.trim(),
+    storage: $("fStorage").value.trim(),
+    extra: $("fExtra").value.trim(),
+    memo: $("fMemo").value.trim(),
+    tags: $("fTags").value.split(/[\s,，、]+/).filter(Boolean),
+    again: $("fAgain").checked,
+  };
+  const before = JSON.stringify(recipes);
+  const isNew = !current;
+  const prev = isNew ? null : recipes.find(x => x.id === current);
+  const hadPhoto = prev?.photo, hadMemo = prev?.memo;
+  const id = current || uid();
+  if (isNew) {
+    recipes.push(normalize({ id, ...data }));
+  } else {
+    Object.assign(prev, data);
+  }
+  if (!persist()) { recipes = JSON.parse(before); return; }
+  const items = [];
+  if (isNew) items.push([10, "レシピを保存"]);
+  if (data.photo && !hadPhoto) items.push([5, "写真"]);
+  if (data.memo && !hadMemo) items.push([5, "感想メモ"]);
+  gain(items);
+  openDetail(id);
+};
+
+/* ---------- マップ ---------- */
+function renderMap() {
+  const cooked = recipes.filter(r => r.made.length);
+  const by = {};
+  for (const r of recipes) {
+    if (!r.country) continue;
+    by[r.country] ??= { cooked: 0, saved: 0 };
+    by[r.country][r.made.length ? "cooked" : "saved"]++;
+  }
+  const world = CUISINES.filter(c => c[0] !== "その他");
+  const done = world.filter(c => by[c[0]]?.cooked).length;
+  const todo = world.filter(c => !by[c[0]]?.cooked);
+  const pick = todo.length ? todo[Math.floor(Date.now() / 864e5) % todo.length] : null;
+
+  const counts = {};
+  for (const r of cooked) {
+    for (const name of ingredientNames(r.ingredients)) {
+      const cat = categorize(name);
+      counts[cat] ??= {};
+      counts[cat][name] = (counts[cat][name] || 0) + 1;
+    }
+  }
+  const total = Object.values(counts).reduce((n, o) => n + Object.keys(o).length, 0);
+  const L = levelOf(meta.xp), hi = need(L + 1);
+
+  $("mapBody").innerHTML = `
+    <div class="profile">
+      <div class="bigring"><svg viewBox="0 0 84 84"><circle class="bg" cx="42" cy="42" r="36"/><circle class="arc" cx="42" cy="42" r="36" transform="rotate(-90 42 42)" style="stroke-dashoffset:${226.2 * (1 - levelRatio())}"/></svg><span>${L}</span></div>
+      <div><div class="sm">Lv.${L}</div><div class="ptitle">${titleOf(L)}</div><div class="sm">${meta.xp} XP ・ 次のレベルまで ${hi - meta.xp}</div></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>${streak()}</b><span class="sm">連続日数</span></div>
+      <div class="stat"><b>${recipes.reduce((n, r) => n + r.made.length, 0)}</b><span class="sm">作った回数</span></div>
+      <div class="stat"><b>${recipes.length}</b><span class="sm">レシピ</span></div>
+    </div>
+    <details><summary>XPのもらい方</summary><ul>${XP_RULES.map(t => `<li>${t}</li>`).join("")}</ul></details>
+    ${meta.log.length ? `<details><summary>最近のXP</summary><ul>${meta.log.slice(0, 8).map(l => `<li>${l.d} ${esc(l.why)} +${l.p}</li>`).join("")}</ul></details>` : ""}
+
+    <h2 class="sec">世界の料理</h2>
+    <div class="sm">作った国・地域 <b style="color:var(--ink);font:600 18px var(--serif)">${done}</b> / ${world.length}</div>
+    <div class="meter"><i style="width:${Math.round(done / world.length * 100)}%"></i></div>
+    <div class="stamps">
+      ${world.map(([name, flag]) => {
+        const s = by[name];
+        const cls = s?.cooked ? "cooked" : s ? "saved" : "";
+        const note = s?.cooked ? `${s.cooked}品` : s ? `気になる${s.saved}` : "";
+        return `<div class="stamp ${cls}" data-c="${esc(name)}"><div class="disc"><span>${flag}</span></div><div class="nm">${esc(name)}</div><div class="ct">${note || "&nbsp;"}</div></div>`;
+      }).join("")}
+    </div>
+    ${pick ? `<div class="nextbox">次は ${pick[1]} <b>${esc(pick[0])}</b> の料理はどうですか?<br><span class="sm">AIに「${esc(pick[0])}の家庭料理を教えて」と聞いてみましょう．</span></div>` : `<div class="nextbox">すべての国・地域を制覇しました!</div>`}
+
+    <h2 class="sec">食材</h2>
+    <div class="sm">使った食材 <b style="color:var(--ink);font:600 18px var(--serif)">${total}</b> 種類(「今日作った」を押したレシピの材料から数えています)</div>
+    <div style="margin-top:8px">
+      ${CAT_ORDER.map(cat => {
+        const items = Object.entries(counts[cat] || {}).sort((a, b) => b[1] - a[1]);
+        return `<div class="cat ${items.length ? "" : "none"}">
+          <h3>${cat}<span>${items.length}種類</span></h3>
+          ${items.length ? items.map(([n, c]) => `<span class="cchip">${esc(n)}${c > 1 ? ` <b>×${c}</b>` : ""}</span>`).join("") : '<span class="sm">まだありません</span>'}
+        </div>`;
+      }).join("")}
+    </div>`;
+}
+$("mapBody").onclick = e => {
+  const t = e.target.closest(".stamp");
+  if (!t || !(t.classList.contains("cooked") || t.classList.contains("saved"))) return;
+  filter = "country:" + t.dataset.c;
+  $("q").value = "";
+  renderList(); show("list");
+};
+
+/* ---------- 相談(質問文づくり) ---------- */
+$("aCountry").innerHTML = `<option value="">おまかせ</option>` +
+  CUISINES.filter(c => c[0] !== "その他").map(c => `<option value="${c[0]}">${c[1]} ${c[0]}</option>`).join("");
+
+function renderPantry() {
+  $("pantryChips").innerHTML = meta.pantry.length
+    ? meta.pantry.map((p, i) => `<span class="pc ${p.off ? "off" : ""}" data-i="${i}" role="button" tabindex="0"><span class="t">${esc(p.name)}</span><span class="x" aria-label="削除">✕</span></span>`).join("")
+    : '<span class="sm">まだ登録されていません</span>';
+}
+function addPantry() {
+  const names = $("pAdd").value.split(/[、，,\s]+/).filter(n => n && !/^[\d０-９]/.test(n) && !/^(半分|半|少し|少々|適量|残り|あと|と|や|など)$/.test(n));
+  for (const name of names) if (!meta.pantry.some(p => p.name === name)) meta.pantry.push({ name, off: false });
+  $("pAdd").value = "";
+  persistMeta(); renderPantry();
+}
+$("pAddBtn").onclick = addPantry;
+$("pAdd").onkeydown = e => { if (e.key === "Enter") addPantry(); };
+$("pantryChips").onclick = e => {
+  const chip = e.target.closest(".pc");
+  if (!chip) return;
+  const i = +chip.dataset.i;
+  if (e.target.classList.contains("x")) meta.pantry.splice(i, 1);
+  else meta.pantry[i].off = !meta.pantry[i].off;
+  persistMeta(); renderPantry();
+};
+
+$("aUnmade").onclick = () => {
+  const cookedCountries = new Set(recipes.filter(r => r.made.length).map(r => r.country));
+  const todo = CUISINES.filter(c => c[0] !== "その他" && !cookedCountries.has(c[0]));
+  if (!todo.length) { alert("すべての国・地域を制覇しています!"); return; }
+  $("aCountry").value = todo[Math.floor(Math.random() * todo.length)][0];
+};
+
+function buildPrompt() {
+  const have = $("aHave").value.trim(), country = $("aCountry").value, time = $("aTime").value;
+  const avoid = $("aAvoid").value.trim(), more = $("aMore").value.trim();
+  const likes = $("aLikes").checked ? recipes.filter(r => r.rating >= 4).slice(0, 8).map(r => r.title) : [];
+  const L = ["家庭で作れる料理のレシピを1品提案してください．", "", "【条件】", `- 人数:${$("aServ").value}人分`];
+  const pantry = meta.pantry.filter(p => !p.off).map(p => p.name);
+  if (pantry.length) L.push(`- 家にある食材:${pantry.join("，")}(全部は使わなくてよいです．なるべくこの中から選び，足りないものは買い足してかまいません)`);
+  if (have) L.push(`- 今日，特に使いたい食材・食べたいもの:${have}`);
+  L.push(`- 国・地域:${country ? country + "の料理" : "おまかせ"}`);
+  if (time) L.push(`- 調理時間:${time}`);
+  if (avoid) L.push(`- 苦手・避けたいもの:${avoid}`);
+  if (likes.length) L.push(`- 好みの参考(これまでに美味しかった料理):${likes.join("，")}`);
+  if (more) L.push(`- その他の希望:${more}`);
+  L.push("", "【出力の形式】", "前置きや締めの言葉は不要です．次の見出しのとおりに書いてください．",
+    "料理名:", "材料(○人分):(1行に1つ，「食材 分量」の形で)", "作り方:(番号つき)", "保存方法:", "ポイント:");
+  return L.join("\n");
+}
+$("aBuild").onclick = () => {
+  $("aOut").value = buildPrompt();
+  $("aResult").hidden = false;
+  $("aNote").textContent = "";
+  $("aOut").scrollIntoView({ behavior: "smooth", block: "center" });
+};
+$("aCopy").onclick = async () => {
+  try { await navigator.clipboard.writeText($("aOut").value); }
+  catch { $("aOut").select(); document.execCommand("copy"); }
+  $("aNote").textContent = "コピーしました．Claudeなどに貼り付けてください．";
+};
+$("aToAdd").onclick = () => { openEdit(null); $("fPaste").focus(); };
+
+/* ---------- 音声入力 ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, recBtn = null;
+document.querySelectorAll("button.mic").forEach(b => { b.innerHTML = MIC; });
+function stopDictation() { if (rec) rec.stop(); }
+function dictate(input, btn) {
+  if (!SR) { alert("このブラウザは音声入力に対応していません．キーボードのマイクボタンで入力できます．"); return; }
+  if (rec) { rec.stop(); return; }
+  rec = new SR();
+  recBtn = btn;
+  rec.lang = "ja-JP";
+  rec.continuous = true;
+  rec.interimResults = false;
+  btn.classList.add("rec");
+  btn.innerHTML = MIC.replace("話す", "止める");
+  rec.onresult = e => {
+    let s = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) s += e.results[i][0].transcript;
+    if (!s) return;
+    const v = input.value;
+    input.value = v + (!v || /[\s、，。．]$/.test(v) ? "" : "、") + s;
+  };
+  rec.onerror = e => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") alert("マイクの使用が許可されていません．ブラウザの設定で許可してください．");
+  };
+  rec.onend = () => {
+    recBtn.classList.remove("rec");
+    recBtn.innerHTML = MIC;
+    rec = null; recBtn = null;
+  };
+  try { rec.start(); } catch { rec = null; btn.classList.remove("rec"); btn.innerHTML = MIC; }
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("button.mic");
+  if (b) dictate($(b.dataset.for), b);
+});
+
+/* ---------- バックアップ ---------- */
+$("export").onclick = () => {
+  const blob = new Blob([JSON.stringify({ version: 2, recipes, meta }, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `recipes-${today()}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+$("import").onclick = () => $("file").click();
+$("file").onchange = async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    const list = Array.isArray(data) ? data : data.recipes;      // 以前の形式(レシピだけの配列)も読める
+    if (!Array.isArray(list)) throw 0;
+    if (!confirm(`${list.length}件を読み込みます．今ある${recipes.length}件は置き換わります．よろしいですか?`)) return;
+    recipes = list.map(normalize); persist();
+    if (!Array.isArray(data) && data.meta) { meta = { pantry: [], xp: 0, log: [], ...data.meta }; persistMeta(); }
+    updateBadge(); renderList();
+  } catch { alert("読み込めませんでした．書き出したファイルを選んでください．"); }
+  e.target.value = "";
+};
+
+show("list");
+renderList();
+</script>
+</body>
+</html>
