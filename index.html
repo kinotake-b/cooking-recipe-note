@@ -1210,6 +1210,126 @@ function unitGrams(food, unit, p) {
   return def || null;
 }
 
+/* ---------- 店名辞書(読み間違いの補正) ---------- */
+/* 書式: 標準名|別名,別名.「は・ば・ぱ」の違いや半角・全角,ひらがな・カタカナの違いは気にしなくてよい(照合のときにそろえる) */
+const STORE_TABLE = `
+まいばすけっと|マイバスケット,MyBasket,My Basket,まいばすけっと
+イオン|AEON,イオンスーパーセンター
+イオンスタイル|AEON STYLE,イオンスタイル
+マックスバリュ|MaxValu,マックスバリュエクスプレス,マックスバリュ
+ザ・ビッグ|THE BIG,ザビッグ
+ミニストップ|MINISTOP,Ministop
+ライフ|LIFE,ライフコーポレーション,ライフ
+西友|SEIYU,せいゆう,リヴィン
+サミット|Summit,サミットストア
+オーケー|OK,オーケーストア,OKストア
+いなげや|inageya,イナゲヤ
+マルエツ|maruetsu,マルエツプチ,マルエツ
+ヨークマート|York Mart,ヨークマ
+ヨークフーズ|York Foods
+ダイエー|Daiei,DAIEI
+イトーヨーカドー|イトーヨーカ堂,Ito-Yokado,ヨーカドー,イトーヨーカドー
+成城石井|SEIJO ISHII,せいじょういしい
+業務スーパー|GYOMU SUPER,ぎょうむスーパー,業務用スーパー
+肉のハナマサ|ハナマサ,プロフーズ
+ロピア|LOPIA
+ベルク|Belc
+ヤオコー|YAOKO
+カスミ|KASUMI
+東急ストア|TOKYU STORE,東急スト
+京王ストア|Keio Store,京王ストア
+小田急OX|OXストア,OX,オーエックス
+オオゼキ|大関,OOZEKI
+コープ|生協,コープみらい,ならコープ,コープさっぽろ,Co-op,COOP
+ピーコックストア|大丸ピーコック,Peacock,ピーコック
+紀ノ国屋|KINOKUNIYA,きのくにや
+文化堂|Bunkado,ぶんかどう
+アキダイ|スーパーアキダイ,AKIDAI
+ピアゴ|miniピアゴ,ミニピアゴ,piago
+ユニー|UNY,アピタ,ピアゴ
+ドン・キホーテ|ドンキ,ドンキホーテ,MEGAドンキ,MEGAドン・キホーテ,驚安の殿堂
+トライアル|TRIAL
+コストコ|COSTCO,Costco
+ビッグ・エー|ビッグエー,BIG-A
+ダイレックス|DIREX
+バロー|Valor,スーパーバロー
+マルイチ|マルイチ産商
+フジ|FUJI,フジスーパー
+オーゼキ|大関ストア
+セブン-イレブン|セブンイレブン,7-ELEVEN,7ELEVEN,セブン-イレブン,セブンーイレブン,セブン
+ファミリーマート|FamilyMart,ファミマ,Family Mart
+ローソン|LAWSON,ローソンストア
+ローソンストア100|LAWSON STORE 100,ローソン100,100円ローソン,ローソンストア100
+ナチュラルローソン|NATURAL LAWSON
+デイリーヤマザキ|ヤマザキデイリーストア,ニューヤマザキデイリーストア,デイリーストア
+ツルハドラッグ|ツルハ,Tsuruha,ツルハグループ
+ウエルシア|Welcia,ウェルシア
+マツモトキヨシ|マツキヨ,matsukiyo,マツモトキヨシ
+スギ薬局|スギドラッグ,Sugi
+サンドラッグ|SUNDRUG
+ココカラファイン|COCOKARA FINE,ココカラ
+ドラッグストアモリ|ドラッグモリ
+クリエイト|クリエイトSD,クリエイトエス・ディー
+ダイコクドラッグ|DAIKOKU
+コスモス薬品|ディスカウントドラッグコスモス,コスモス
+キリン堂|KIRINDO
+ココスーパー|COCO SUPER
+スーパーマルハチ|マルハチ
+`;
+const STORES = [], STORE_KEYS = new Map();
+for (const line of STORE_TABLE.split("\n")) {
+  const p = line.split("|");
+  if (p.length < 2) continue;
+  const store = { name: p[0] };
+  STORES.push(store);
+  for (const k of [p[0], ...p[1].split(",")]) { const key = foldKana(k); if (key && !STORE_KEYS.has(key)) STORE_KEYS.set(key, store); }
+}
+/* 文字列の「先頭」が店名辞書に合えば { name(標準名), rest(店名のあとに続く部分:「大岡山1丁目店」など) } を返す */
+function matchStoreText(text) {
+  const s = String(text || "").normalize("NFKC").trim();
+  if (!s) return null;
+  const whole = foldKana(s);
+  const exact = STORE_KEYS.get(whole);
+  if (exact) return { name: exact.name, rest: "" };
+  const words = s.split(/\s+/), first = STORE_KEYS.get(foldKana(words[0]));            // 「OK 大岡山店」のように先頭の1語が店名
+  if (first && words.length > 1) return { name: first.name, rest: words.slice(1).join(" ") };
+  let best = null, bl = 0;                           // 先頭が店名と同じ(長い店名を優先).3文字以上の店名だけ
+  for (const [k, st] of STORE_KEYS) if (k.length >= 3 && whole.startsWith(k) && k.length > bl) { best = st; bl = k.length; }
+  if (!best) {                                       // 先頭が1文字違い(読み間違い)
+    for (const [k, st] of STORE_KEYS) {
+      if (k.length < 4) continue;
+      for (const n of [k.length - 1, k.length, k.length + 1]) if (n > 0 && levenshtein1(whole.slice(0, n), k) && k.length > bl) { best = st; bl = k.length; }
+    }
+  }
+  if (!best) return null;
+  let rest = "";
+  for (let n = 1; n <= s.length; n++) {              // 元の文字列のどこまでが店名か(折りたたんだ形で数える)
+    if (foldKana(s.slice(0, n)).length >= bl) { rest = s.slice(n).replace(/^[ー\-・\s]+/, "").trim(); break; }
+  }
+  return { name: best.name, rest };
+}
+/* 入力された店名を,辞書の名前に直す(辞書にないものはそのまま) */
+function fixStoreName(text) {
+  const s = String(text || "").trim();
+  const m = matchStoreText(s);
+  if (!m) return s;
+  return m.rest ? `${m.name} ${m.rest}` : m.name;
+}
+const storeBrand = x => { const m = matchStoreText(x); return m ? m.name : String(x || "").trim(); };
+const sameStore = (a, b) => !!a && !!b && (a === b || storeBrand(a) === storeBrand(b));     // 「まいばすけっと」と「まいばすけっと 大岡山1丁目店」は同じチェーン
+/* レシートの上のほうの行から店名を探す.店名の次の行が「〇〇店」なら支店名として足す */
+function guessStore(lines) {
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    const m = matchStoreText(lines[i]);
+    if (!m) continue;
+    const next = lines[i + 1];
+    const branch = m.rest || (next && /店$/.test(next) && next.length <= 20 ? next : "");
+    return branch ? `${m.name} ${branch.trim()}` : m.name;
+  }
+  const hasHeader = lines.some(l => RECEIPT_HEADER.test(l));                  // 辞書にないときは,日付・TELなどの行があれば最初の行を店名とみなす
+  return hasHeader && lines[0] && !/\d/.test(lines[0]) && lines[0].length <= 20 ? lines[0] + (lines[1] && /店$/.test(lines[1]) ? " " + lines[1] : "") : "";
+}
+
 /* レシピの分量を「重さ(g)・体積(ml)・個数」のどれかにそろえる */
 function amountBase(amount, note) {
   const a = String(amount || "").trim();
@@ -1247,7 +1367,7 @@ function findPrice(name, prices, mainStore) {
     else if (fa && fa === foodOf(p.name)) score = 100;                       // 「ビーマン」と「ピーマン」など,辞書で同じ食材
     else if (n.length >= 2 && pn.length >= 2 && (n.includes(pn) || pn.includes(n))) score = Math.min(n.length, pn.length) * 10;
     if (!score) continue;
-    if (mainStore && p.store === mainStore) score += 5;
+    if (mainStore && sameStore(p.store, mainStore)) score += 5;                 // メインのスーパーと同じチェーンなら優先
     if (!best || score > bestScore || (score === bestScore && (p.date || "") > (best.date || ""))) { best = p; bestScore = score; }
   }
   return best;
@@ -1322,8 +1442,7 @@ function parseReceipt(text) {
   const lines = norm.split("\n").map(l => l.replace(/[¥￥]/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
   const dm = norm.match(/(\d{4})[\/年.-](\d{1,2})[\/月.-](\d{1,2})/);
   const date = dm ? `${dm[1]}-${dm[2].padStart(2, "0")}-${dm[3].padStart(2, "0")}` : "";
-  const hasHeader = lines.some(l => RECEIPT_HEADER.test(l));                  // 日付・TEL・レジ番号などの行があるときだけ,最初の行を店名とみなす
-  const store = hasHeader && lines[0] && !/\d/.test(lines[0]) && lines[0].length <= 20 ? lines[0] + (lines[1] && /店$/.test(lines[1]) ? " " + lines[1] : "") : "";
+  const store = guessStore(lines);                                              // 店名:辞書で補正(読み間違いも直す)
   // ① 1行に「品名 値段」
   const same = [];
   for (const line of lines) {
@@ -1363,7 +1482,7 @@ function parseReceipt(text) {
 /* 値段の登録・レシート取り込みの画面 */
 let priceEditId = null;
 function refreshLists() {
-  const stores = [...new Set((meta.prices || []).map(p => p.store).filter(Boolean))];
+  const stores = [...new Set([...(meta.prices || []).map(p => p.store).filter(Boolean), ...STORES.map(x => x.name)])];
   $("storeList").innerHTML = stores.map(s => `<option value="${esc(s)}">`).join("");
   const names = new Set(meta.pantry.map(p => p.name));
   for (const r of recipes) for (const x of ingredientRows(r.ingredients)) if (!x.head) names.add(x.name.replace(/[（(].*$/, "").trim());
@@ -1407,6 +1526,7 @@ function updateGpuHint() {
   $("pGpu").placeholder = g ? `目安:${g}g(辞書)` : "空欄なら食材辞書の目安";
 }
 $("pName").addEventListener("input", updateGpuHint);
+for (const id of ["pStore", "rStore"]) $(id).addEventListener("change", () => { $(id).value = fixStoreName($(id).value); });   // 店名を辞書の名前に直す
 $("pUnit").addEventListener("change", updateGpuHint);
 $("psheet").onclick = e => { if (e.target.closest("[data-ps=close]")) $("psheet").hidden = true; };
 $("pSave").onclick = () => {
@@ -1493,6 +1613,7 @@ function pricesAccordionHtml() {
     </div></details>`;
 }
 $("mapBody").addEventListener("input", e => { if (e.target.id === "mainStore") { meta.mainStore = e.target.value.trim(); persistMeta(); } });
+$("mapBody").addEventListener("change", e => { if (e.target.id === "mainStore") { e.target.value = fixStoreName(e.target.value); meta.mainStore = e.target.value.trim(); persistMeta(); } });
 
 /* 詳細画面の「材料費の目安」と,一覧のカードの金額 */
 function costHtml(r) {
