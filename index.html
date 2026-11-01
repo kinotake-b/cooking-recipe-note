@@ -307,12 +307,16 @@
   .ps-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font: 600 18px var(--serif); }
   .inl { display: flex; gap: 6px; }
   .inl select { width: 84px; flex: none; }
-  .rit { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); }
-  .rit > input[type=checkbox] { width: 22px; height: 22px; min-height: 0; margin-top: 12px; accent-color: var(--accent); flex: none; }
-  .rit .rf { flex: 1; min-width: 0; }
-  .rline { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 14px; color: var(--sub); white-space: nowrap; }
-  .rline .rp { width: 84px; } .rline .rq { width: 72px; } .rline .ru { width: 76px; flex: none; }
-  .rline .rq.ng { border-color: var(--accent); background: var(--tint); }
+  .rit, .rhead { display: grid; grid-template-columns: 22px minmax(0, 1fr) 58px 50px 66px; gap: 6px; align-items: center; }
+  .rit { padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .rit input[type=checkbox] { width: 22px; height: 22px; min-height: 0; accent-color: var(--accent); }
+  .rit input:not([type=checkbox]), .rit select { width: 100%; min-width: 0; min-height: 44px; padding: 8px 6px; font-size: 15px; border-radius: 10px; }
+  .rit select { padding: 8px 2px; }
+  .rit .rq.ng { border-color: var(--accent); background: var(--tint); }
+  .rit .rn.fixed { background: var(--tint); }
+  .rhead { font-size: 12px; color: var(--sub); padding: 10px 0 2px; }
+  .rhead span:nth-child(4) { grid-column: 4 / 6; }
+  .ps-card.tall { padding-left: 12px; padding-right: 12px; }
 
   .toast {
     position: fixed; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 40;
@@ -1318,7 +1322,8 @@ function parseReceipt(text) {
   const lines = norm.split("\n").map(l => l.replace(/[¥￥]/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
   const dm = norm.match(/(\d{4})[\/年.-](\d{1,2})[\/月.-](\d{1,2})/);
   const date = dm ? `${dm[1]}-${dm[2].padStart(2, "0")}-${dm[3].padStart(2, "0")}` : "";
-  const store = lines[0] && !/\d/.test(lines[0]) && lines[0].length <= 20 ? lines[0] + (lines[1] && /店$/.test(lines[1]) ? " " + lines[1] : "") : "";
+  const hasHeader = lines.some(l => RECEIPT_HEADER.test(l));                  // 日付・TEL・レジ番号などの行があるときだけ,最初の行を店名とみなす
+  const store = hasHeader && lines[0] && !/\d/.test(lines[0]) && lines[0].length <= 20 ? lines[0] + (lines[1] && /店$/.test(lines[1]) ? " " + lines[1] : "") : "";
   // ① 1行に「品名 値段」
   const same = [];
   for (const line of lines) {
@@ -1435,18 +1440,17 @@ function renderReceiptList(res) {
       <div class="row"><button class="btn line" id="rRepair">この組み合わせで並べる</button></div>`;
     return;
   }
-  const items = res.items;
+  const items = res.items, fixed = items.filter(it => it.orig).length;
   $("rList").innerHTML = items.length
-    ? `<div class="sm" style="margin:12px 0 4px">${items.length}件見つかりました．食材でないものはチェックを外し，品名は料理で使う名前に直してください．内容量を確かめてください．</div>` +
+    ? `<div class="sm" style="margin:12px 0 2px">${items.length}件見つかりました．食材でないものはチェックを外し，赤い枠の内容量を入れてください．${fixed ? "色のついた品名は，自動で直したものです．" : ""}</div>
+      <div class="rhead"><span></span><span>品名</span><span>値段(円)</span><span>内容量</span></div>` +
       items.map(it => `<div class="rit">
         <input type="checkbox" checked aria-label="登録する">
-        <div class="rf">
-          <input class="rn" list="ingNames" value="${esc(it.name)}" aria-label="品名">
-          ${it.orig ? `<div class="sm" style="margin-top:4px;color:var(--accent)">「${esc(it.orig)}」を「${esc(it.name)}」に補正しました</div>` : ""}
-          <div class="rline"><input class="rp" inputmode="numeric" value="${it.price}" aria-label="値段"><span>円 ／</span>
-            <input class="rq ${it.guess ? "" : "ng"}" inputmode="decimal" value="${esc(it.qty)}" aria-label="内容量">
-            <select class="ru" aria-label="単位">${PRICE_UNITS.map(u => `<option ${u === it.unit ? "selected" : ""}>${u}</option>`).join("")}</select></div>
-        </div></div>`).join("")
+        <input class="rn ${it.orig ? "fixed" : ""}" list="ingNames" value="${esc(it.name)}" aria-label="品名" ${it.orig ? `title="元の表記:${esc(it.orig)}"` : ""}>
+        <input class="rp" inputmode="numeric" value="${it.price}" aria-label="値段(円)">
+        <input class="rq ${it.guess ? "" : "ng"}" inputmode="decimal" value="${esc(it.qty)}" aria-label="内容量">
+        <select class="ru" aria-label="単位">${PRICE_UNITS.map(u => `<option ${u === it.unit ? "selected" : ""}>${u}</option>`).join("")}</select>
+      </div>`).join("")
     : '<div class="sm" style="margin-top:12px">値段のついた行が見つかりませんでした．文字がうまくコピーできているか見てください．</div>';
   $("rSave").hidden = !items.length;
 }
