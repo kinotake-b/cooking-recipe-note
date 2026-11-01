@@ -285,6 +285,13 @@
   .ck-hint { flex: 1; text-align: right; font-size: 13px; color: var(--sub); align-self: center; }
   .photo img { cursor: pointer; }
 
+  /* 人数の切り替え */
+  .serv { display: flex; align-items: center; gap: 10px; margin: 4px 0 6px; }
+  .serv button[data-sv="-1"], .serv button[data-sv="1"] { width: 44px; height: 44px; border-radius: 50%; background: var(--soft); font-size: 22px; line-height: 1; }
+  .serv b { font: 600 18px var(--serif); min-width: 76px; text-align: center; white-space: nowrap; }
+  .serv .sm, .serv .btn.text { white-space: nowrap; }
+  .serv .btn.text { padding: 0 4px; margin-left: auto; }
+
   .toast {
     position: fixed; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 40;
     max-width: 480px; margin: 0 auto; text-align: center; white-space: pre-line;
@@ -928,9 +935,80 @@ $("cards").onclick = e => {
 };
 
 /* ---------- 詳細 ---------- */
+/* ---------- 人数に合わせて分量を計算する ---------- */
+const QTY_NUM = "(?:\\d+\\s*と\\s*\\d+\\/\\d+|\\d+\\/\\d+|\\d+(?:\\.\\d+)?)";       // 1と1/2 ・ 1/2 ・ 1.5 ・ 3
+const QTY_UNIT = /^(パック|切れ|カップ|かけ|kg|ml|mL|cc|g|L|個|枚|本|片|束|株|玉|丁|袋|缶|杯|合|房|尾|匹|粒|滴|cm|mm|分|秒|度|℃|回|時間|日)/;
+const NOT_SCALED = new Set(["cm", "mm", "分", "秒", "度", "℃", "回", "時間", "日"]);   // 長さ・時間・温度は人数で変わらない
+const METRIC = new Set(["g", "kg", "ml", "mL", "L", "cc"]);
+function parseQty(s) {
+  let m = s.match(/^(\d+)\s*と\s*(\d+)\/(\d+)$/);
+  if (m) return +m[1] + m[2] / m[3];
+  m = s.match(/^(\d+)\/(\d+)$/);
+  return m ? m[1] / m[2] : parseFloat(s);
+}
+function fracText(r) {
+  const w = Math.floor(r + 1e-9), fr = Math.round((r - w) * 8);
+  const FR = ["", "1/8", "1/4", "3/8", "1/2", "5/8", "3/4", "7/8"];
+  return !fr ? String(w) : w ? `${w}と${FR[fr]}` : FR[fr];
+}
+function fmtQty(v, kind, unit) {
+  if (kind === "metric") {
+    if (unit === "kg" || unit === "L") return String(Math.max(0.05, Math.round(v * 20) / 20));
+    if (v >= 100) return String(Math.round(v / 5) * 5);
+    if (v >= 10) return String(Math.round(v));
+    return String(Math.max(0.5, Math.round(v * 2) / 2));
+  }
+  const step = kind === "spoon" ? 0.25 : v < 1 ? 0.125 : 0.25;
+  return fracText(Math.max(step, Math.round(v / step) * step));
+}
+/* text の中の数量を f 倍にする.strict=true のときは,単位がついた数だけ(補足の「約250g」用) */
+function scaleText(text, f, strict) {
+  if (!text || !f || f === 1) return text;
+  const re = new RegExp(`(半分|半(?=[個束丁玉本枚片株袋缶])|${QTY_NUM})(\\s*[〜~]\\s*(${QTY_NUM}))?`, "g");
+  return text.replace(re, (m, a, range, b, off) => {
+    const before = text.slice(0, off), after = text.slice(off + m.length);
+    if (a === "半分") return strict ? m : `${fmtQty(0.5 * f, "count")}個分`;
+    const um = after.match(QTY_UNIT), unit = um ? um[1] : "";
+    if (NOT_SCALED.has(unit) || (strict && !um)) return m;
+    const kind = /(大さじ|小さじ|カップ)\s*$/.test(before) ? "spoon" : METRIC.has(unit) ? "metric" : "count";
+    const one = x => fmtQty((x === "半" ? 0.5 : parseQty(x)) * f, kind, unit);
+    return one(a) + (b ? "〜" + one(b) : "");
+  });
+}
+/* 「2人分」「12個分」から,元の人数(個数)と単位を取り出す */
+function parseServings(s) {
+  const m = String(s || "").match(/(\d+)(?:\s*[〜~\-]\s*\d+)?\s*(人分|人前|人|個分|個|枚分|枚|本分|本|皿分|皿|杯分|杯|切れ分|切れ)?/);
+  if (!m || !+m[1]) return null;
+  const u = m[2] || "人分";
+  return { n: +m[1], unit: /[分前]$/.test(u) ? u : u + "分" };
+}
+let viewServ = 0, viewFactor = 1;                 // いま見ている人数と,元のレシピに対する倍率
 const ingHtml = i => i.head
   ? `<div class="subhead">${esc(i.head)}</div>`
-  : `<div class="ing"><span class="nm">${esc(i.name)}${i.note ? `<small>${esc(i.note)}</small>` : ""}</span><span class="amt">${esc(i.amount)}</span></div>`;
+  : `<div class="ing"><span class="nm">${esc(i.name)}${i.note ? `<small>${esc(scaleText(i.note, viewFactor, true))}</small>` : ""}</span><span class="amt">${esc(scaleText(i.amount, viewFactor))}</span></div>`;
+function ingWrapHtml(r) {
+  const base = parseServings(r.servings);
+  const rows = ingredientRows(r.ingredients).map(ingHtml).join("");
+  if (!base) return `<div class="sm" style="margin:-4px 0 8px">人数を変えて分量を計算するには，編集で「何人分」を入れてください．</div>${rows}`;
+  const n = viewServ || base.n;
+  return `<div class="serv">
+      <span class="sm">人数</span>
+      <button data-sv="-1" aria-label="1つ減らす">−</button><b>${n}${base.unit}</b><button data-sv="1" aria-label="1つ増やす">＋</button>
+      ${n !== base.n ? `<button class="btn text" data-sv="reset">元に戻す</button>` : ""}
+    </div>
+    <div class="sm" style="margin:0 0 4px">${n !== base.n ? "分量を計算しなおしています(作り方の数字は変わりません)．調味料は味を見ながら加減してください．" : "タップでチェックできます．"}</div>${rows}`;
+}
+function stepServ(cmd) {
+  const r = recipes.find(x => x.id === current), base = parseServings(r.servings);
+  if (!base) return;
+  const n = viewServ || base.n;
+  viewServ = cmd === "reset" ? 0 : Math.min(99, Math.max(1, n + +cmd));
+  if (viewServ === base.n) viewServ = 0;
+  viewFactor = viewServ ? viewServ / base.n : 1;
+  const wrap = $("ingWrap"), done = [...wrap.querySelectorAll(".ing")].map(e => e.classList.contains("done"));
+  wrap.innerHTML = ingWrapHtml(r);
+  wrap.querySelectorAll(".ing").forEach((e, i) => e.classList.toggle("done", !!done[i]));   // チェックは残す
+}
 const stepHtml = s => (s.lead ? `<b>${esc(s.lead)}</b> ` : "") + esc(s.text);
 function stepsHtml(steps) {
   return `<ol class="steps">${steps.map((s, i) =>
@@ -950,6 +1028,7 @@ function notesHtml(text) {       // 箇条書きなら「見出し語+本文」�
 }
 function openDetail(id) {
   current = id;
+  viewServ = 0; viewFactor = 1;
   const r = recipes.find(x => x.id === id);
   const ing = ingredientRows(r.ingredients);
   const steps = parseSteps(r.steps);
@@ -972,7 +1051,7 @@ function openDetail(id) {
     </div>
     <div class="mades">${r.made.length ? `作った記録:${r.made.slice().reverse().join(" / ")}` : "まだ作っていません"}</div>
     ${r.memo ? `<h2 class="sec">メモ</h2><div class="note">${esc(r.memo)}</div>` : ""}
-    ${ing.length ? `<h2 class="sec">材料</h2><div class="sm" style="margin:-4px 0 4px">タップでチェックできます</div>${ing.map(ingHtml).join("")}` : ""}
+    ${ing.length ? `<h2 class="sec">材料</h2><div id="ingWrap">${ingWrapHtml(r)}</div>` : ""}
     ${steps.length ? `<h2 class="sec">作り方</h2>${stepsHtml(steps)}` : ""}
     ${r.storage ? `<h2 class="sec">保存方法</h2>${notesHtml(r.storage)}` : ""}
     ${r.extra ? `<h2 class="sec">ポイント・アレンジ</h2>${notesHtml(r.extra)}` : ""}
@@ -980,6 +1059,8 @@ function openDetail(id) {
   show("detail");
 }
 $("detailBody").onclick = e => {
+  const sv = e.target.closest("[data-sv]");
+  if (sv) return stepServ(sv.dataset.sv);
   const id = e.target.id;
   const r = recipes.find(x => x.id === current);
   const ing = e.target.closest(".ing");
