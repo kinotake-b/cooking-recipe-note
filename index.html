@@ -1022,29 +1022,70 @@ function calcCost(r, factor = 1) {
   return { rows, total: rows.reduce((s, x) => s + x.yen, 0), eligible: eligible.length, covered: covered.length };
 }
 
-/* レシートの文字から「品名と値段」の候補を拾う */
-const RECEIPT_SKIP = /(合計|小計|お預|お釣|釣銭|おつり|現金|クレジット|カード|ポイント|消費税|税込|税率|内税|外税|対象|レジ|責任者|領収|電話|TEL|登録番号|番号|点数|ありがとう|いらっしゃい|値引|割引|クーポン|チャージ|\d{4}[\/年.-]\d{1,2}[\/月.-]\d{1,2}|\d{1,2}:\d{2})/i;
-function parseReceipt(text) {
+/* レシートの文字から「品名と値段」の候補を拾う.
+   ①1行に「品名 値段」が並ぶ形 と ②品名の列→値段の列に分かれて並ぶ形(スマホの文字コピーでよくなる形)の両方に対応 */
+const RECEIPT_SKIP = /(合計|小計|お預|お釣|釣銭|おつり|現金|クレジット|カード|ポイント|消費税|税込|税率|内税|外税|対象|レジ|責任者|領収|電話|TEL|FAX|登録番号|番号|点数|ありがとう|いらっしゃい|値引|割引|クーポン|チャージ|責[:：]|取\d{3,}|\d{4}[\/年.-]\d{1,2}[\/月.-]\d{1,2}|\d{1,2}:\d{2})/i;
+const RECEIPT_LABEL = /(小計|合計|外税|内税|対象額|消費税|税込|お預|お釣|釣銭|クレジット|現金)/;
+const RECEIPT_HEADER = /(TEL|FAX|領収|レジ|登録番号|責[:：]|取\d{3,}|\d{4}[\/年.-]\d{1,2}[\/月.-]\d{1,2}|^\d{1,2}:\d{2}$|\d{2,4}-\d{3,4}-\d{3,4})/i;
+const PRICE_ONLY = /^[·・.\s]*[¥￥]?\s*(\d{1,3}(?:,\d{3})+|\d+)\s*円?\s*([※*軽ⓜ]?)\s*$/;
+const HAS_WORD = /[A-Za-zぁ-んァ-ヶ一-龠]/;
+function receiptItem(rawName, price) {
+  let name = String(rawName).replace(/^[\d\s*#-]{3,}\s+/, "").replace(/[*※軽ⓜ]+$/g, "").trim();
+  if (!name || !HAS_WORD.test(name) || name.length > 30) return null;
+  let qty = "1", unit = "個", guess = false;
+  const w = name.match(/(\d+(?:\.\d+)?)\s*(kg|g|ml|L)\b/i), k = name.match(/(\d+)\s*(?:個|本|枚|パック|袋)?\s*入/), c = name.match(/(\d+)\s*(個|本|枚|玉|束|丁|缶|袋|パック)$/);
+  if (w) { const x = parseFloat(w[1]), u = w[2].toLowerCase(); unit = u === "ml" || u === "l" ? "ml" : "g"; qty = String(u === "kg" || u === "l" ? x * 1000 : x); guess = true; name = name.replace(w[0], ""); }
+  else if (k) { qty = k[1]; guess = true; name = name.replace(k[0], ""); }
+  else if (c) { qty = c[1]; unit = c[2]; guess = true; name = name.replace(c[0], ""); }
+  name = name.replace(/\s+/g, " ").trim() || String(rawName).trim();
+  return { name, price, qty, unit, guess };
+}
+function pairReceipt(names, prices) {
   const items = [];
-  for (let line of String(text || "").normalize("NFKC").split("\n")) {
-    line = line.replace(/[¥￥]/g, " ").replace(/\s+/g, " ").trim();
-    if (!line || RECEIPT_SKIP.test(line)) continue;
+  names.forEach((n, i) => { const it = receiptItem(n, prices[i]); if (it && prices[i] >= 10 && prices[i] <= 20000) items.push(it); });
+  return items;
+}
+function parseReceipt(text) {
+  const norm = String(text || "").normalize("NFKC");
+  const lines = norm.split("\n").map(l => l.replace(/[¥￥]/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
+  const dm = norm.match(/(\d{4})[\/年.-](\d{1,2})[\/月.-](\d{1,2})/);
+  const date = dm ? `${dm[1]}-${dm[2].padStart(2, "0")}-${dm[3].padStart(2, "0")}` : "";
+  const store = lines[0] && !/\d/.test(lines[0]) && lines[0].length <= 20 ? lines[0] + (lines[1] && /店$/.test(lines[1]) ? " " + lines[1] : "") : "";
+  // ① 1行に「品名 値段」
+  const same = [];
+  for (const line of lines) {
+    if (RECEIPT_SKIP.test(line)) continue;
     const m = line.match(/^(.+?)\s*(\d{1,3}(?:,\d{3})+|\d+)\s*円?\s*[*※軽ⓜ]?\s*$/);
     if (!m) continue;
     const price = parseInt(m[2].replace(/,/g, ""), 10);
     if (price < 10 || price > 20000) continue;
-    let name = m[1].replace(/^[\d\s*#-]{3,}\s+/, "").replace(/[*※軽]+$/g, "").trim();          // 先頭の商品コードなどを外す
-    if (!name || /^[\d\s.,x×]+$/.test(name) || name.length > 30) continue;
-    let qty = "1", unit = "個", guess = false;
-    const w = name.match(/(\d+(?:\.\d+)?)\s*(kg|g|ml|L)\b/i), k = name.match(/(\d+)\s*(?:個|本|枚|パック|袋)?\s*入/);
-    if (w) { const x = parseFloat(w[1]), u = w[2].toLowerCase(); unit = u === "ml" || u === "l" ? "ml" : "g"; qty = String(u === "kg" || u === "l" ? x * 1000 : x); guess = true; name = name.replace(w[0], ""); }
-    else if (k) { qty = k[1]; guess = true; name = name.replace(k[0], ""); }
-    name = name.replace(/\s+/g, " ").trim() || m[1].trim();
-    items.push({ name, price, qty, unit, guess });
+    const it = receiptItem(m[1], price);
+    if (it) same.push(it);
   }
-  return items;
+  if (same.length >= 2) return { items: same, mismatch: false, date, store };
+  // ② 品名の列 → 値段の列
+  const prices = [];
+  lines.forEach((l, i) => { const m = l.match(PRICE_ONLY); if (m) prices.push({ v: parseInt(m[1].replace(/,/g, ""), 10), mark: m[2], i }); });
+  let itemPrices = [], sum = 0;
+  for (let k = 0; k < prices.length; k++) {                     // 「ここまでの合計と同じ金額」が出てきたら,そこが小計.その手前までが商品の値段
+    if (k >= 2 && prices[k].v === sum) { itemPrices = prices.slice(0, k); break; }
+    sum += prices[k].v;
+  }
+  if (!itemPrices.length) { const marked = prices.filter(p => p.mark); itemPrices = marked.length ? marked : prices.filter(p => p.v >= 10 && p.v <= 20000); }
+  const firstPrice = prices.length ? prices[0].i : lines.length;
+  let hdr = -1;
+  lines.forEach((l, i) => { if (i < firstPrice && RECEIPT_HEADER.test(l)) hdr = i; });
+  const names = [];
+  for (let i = hdr + 1; i < lines.length; i++) {
+    const l = lines[i];
+    if (PRICE_ONLY.test(l) || RECEIPT_LABEL.test(l)) break;       // 値段の列・「小計」などに入ったら終わり
+    if (RECEIPT_SKIP.test(l) || !HAS_WORD.test(l)) continue;
+    names.push(l.replace(/[*※軽ⓜ]+$/g, "").trim());
+  }
+  const vals = itemPrices.map(p => p.v);
+  if (names.length && names.length === vals.length) return { items: pairReceipt(names, vals), mismatch: false, date, store };
+  return { items: [], mismatch: names.length > 0 || vals.length > 0, names, prices: vals, date, store };
 }
-
 
 /* 値段の登録・レシート取り込みの画面 */
 let priceEditId = null;
@@ -1059,7 +1100,7 @@ function upsertPrice(e, id) {                       // 同じ食材・お店・�
   meta.prices ??= [];
   const t = id ? meta.prices.find(x => x.id === id)
     : meta.prices.find(x => normName(x.name) === normName(e.name) && x.store === e.store && x.unit === e.unit);
-  if (t) Object.assign(t, e, { date: today() }); else meta.prices.push({ id: uid(), ...e, date: today() });
+  if (t) Object.assign(t, e, { date: e.date || today() }); else meta.prices.push({ id: uid(), ...e, date: e.date || today() });
   persistMeta();
 }
 function refreshIngWrap() {                          // 詳細画面の材料(材料費つき)を作り直す.チェックは残す
@@ -1102,11 +1143,23 @@ $("pDel").onclick = () => {
 /* レシート取り込み:スマホで写真の文字をコピーして貼る → 品名と値段を拾う → 内容量を確かめて登録 */
 function openReceipt() {
   refreshLists();
-  $("rText").value = ""; $("rList").innerHTML = ""; $("rSave").hidden = true;
+  $("rText").value = ""; $("rList").innerHTML = ""; $("rSave").hidden = true; receiptDate = "";
   $("rStore").value = meta.mainStore || "";
   $("rsheet").hidden = false;
 }
-function renderReceiptList(items) {
+let receiptDate = "";
+function renderReceiptList(res) {
+  receiptDate = res.date || "";
+  if (res.store && !$("rStore").value.trim()) $("rStore").value = res.store;
+  if (res.mismatch) {                                  // 品名と値段の数が合わない → 並びを直してもらう
+    $("rSave").hidden = true;
+    $("rList").innerHTML = `<div class="sm" id="rMsg" style="margin:12px 0 4px;color:var(--accent)">品名が${res.names.length}件，値段が${res.prices.length}件で，数が合いません．品名が1行にくっついているかもしれません．分けたいところで改行して，品名と値段が同じ数・同じ順になるようにしてください．</div>
+      <div class="two"><div><label class="l" for="rNames">品名(1行に1つ)</label><textarea id="rNames" rows="9">${esc(res.names.join("\n"))}</textarea></div>
+      <div><label class="l" for="rPrices">値段(1行に1つ)</label><textarea id="rPrices" rows="9">${res.prices.join("\n")}</textarea></div></div>
+      <div class="row"><button class="btn line" id="rRepair">この組み合わせで並べる</button></div>`;
+    return;
+  }
+  const items = res.items;
   $("rList").innerHTML = items.length
     ? `<div class="sm" style="margin:12px 0 4px">${items.length}件見つかりました．食材でないものはチェックを外し，品名は料理で使う名前に直してください．内容量を確かめてください．</div>` +
       items.map(it => `<div class="rit">
@@ -1128,14 +1181,22 @@ $("rSave").onclick = () => {
     if (!row.querySelector("input[type=checkbox]").checked) continue;
     const name = row.querySelector(".rn").value.trim(), price = parseFloat(row.querySelector(".rp").value), qty = parseFloat(row.querySelector(".rq").value);
     if (!name || !(price > 0) || !(qty > 0)) continue;
-    upsertPrice({ name, price, qty, unit: row.querySelector(".ru").value, store }, null); n++;
+    upsertPrice({ name, price, qty, unit: row.querySelector(".ru").value, store, date: receiptDate }, null); n++;
   }
   if (store && !meta.mainStore) { meta.mainStore = store; persistMeta(); }
   $("rsheet").hidden = true;
   toast(n ? `${n}件を値段帳に登録しました` : "登録できるものがありませんでした");
   afterPriceChange();
 };
-$("rsheet").onclick = e => { if (e.target.closest("[data-rs=close]")) $("rsheet").hidden = true; };
+$("rsheet").onclick = e => {
+  if (e.target.closest("[data-rs=close]")) $("rsheet").hidden = true;
+  if (e.target.closest("#rRepair")) {
+    const names = $("rNames").value.split("\n").map(x => x.trim()).filter(Boolean);
+    const prices = $("rPrices").value.split("\n").map(x => parseInt(x.replace(/[^\d]/g, ""), 10)).filter(n => n > 0);
+    if (names.length !== prices.length) { $("rMsg").textContent = `品名が${names.length}件，値段が${prices.length}件です．同じ数にしてください．`; return; }
+    renderReceiptList({ items: pairReceipt(names, prices), date: receiptDate, store: "" });
+  }
+};
 
 /* マイページの「値段帳」 */
 function pricesAccordionHtml() {
