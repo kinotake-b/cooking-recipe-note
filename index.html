@@ -487,6 +487,8 @@
       <div><label class="l" for="pQty">内容量と単位</label><div class="inl"><input id="pQty" inputmode="decimal" placeholder="300"><select id="pUnit" aria-label="単位"></select></div></div>
     </div>
     <div class="sm" style="margin-top:6px">例:「鶏むね肉 300gで258円」なら 258 と 300 g．レシピがgで書かれているものは，gで登録すると計算できます．</div>
+    <label class="l" for="pGpu">1個(1本・1パックなど)の重さ(g)・わかれば</label>
+    <input id="pGpu" inputmode="decimal" placeholder="空欄なら食材辞書の目安">
     <label class="l" for="pStore">買ったお店</label>
     <input id="pStore" list="storeList" placeholder="例:○○スーパー">
     <div class="row"><button class="btn primary" id="pSave">保存</button><button class="btn danger" id="pDel" hidden>消す</button></div>
@@ -954,6 +956,256 @@ const normName = s => {
 };
 const yen = n => Math.round(n).toLocaleString("ja-JP");
 
+/* ---------- 食材辞書(別名・売り方・1個あたりの重さの目安) ---------- */
+/* 書式: 標準名|別名,別名|ふだんの売り方|重さ(g).  重さは「標準的な大きさ」の目安で,公的な基準ではない.
+   売り方が g / ml のものは,重さで売られる(1個の重さは持たない).「個:60,パック:600」のように単位ごとに書くこともある. */
+const FOOD_TABLE = `
+玉ねぎ|たまねぎ,玉葱,オニオン,新玉ねぎ,新たまねぎ|個|200
+じゃがいも|ジャガイモ,じゃが芋,馬鈴薯,男爵,メークイン,新じゃが,新じゃがいも|個|150
+にんじん|人参,ニンジン,キャロット|本|150
+大根|だいこん,ダイコン|本|1000
+キャベツ|きゃべつ,春キャベツ,新キャベツ|玉|1000
+白菜|はくさい,ハクサイ|株|2000
+レタス|れたす,玉レタス,サニーレタス,リーフレタス,グリーンリーフ|玉|300
+トマト|とまと,大玉トマト,中玉トマト|個|150
+ミニトマト|みにとまと,プチトマト|パック|200
+きゅうり|キュウリ,胡瓜|本|100
+なす|ナス,茄子,なすび|本|80
+ピーマン|ぴーまん,青ピーマン|個|30
+パプリカ|ぱぷりか,赤パプリカ,黄パプリカ,カラーピーマン|個|150
+ほうれん草|ほうれんそう,ホウレンソウ,ホウレン草|束|200
+小松菜|こまつな,コマツナ|束|250
+ブロッコリー|ぶろっこりー|株|250
+カリフラワー|かりふらわー|株|400
+かぼちゃ|カボチャ,南瓜,パンプキン|個|1200
+ごぼう|ゴボウ,牛蒡|本|150
+れんこん|レンコン,蓮根|節|200
+さつまいも|サツマイモ,薩摩芋,さつま芋,さつま|本|250
+長いも|ながいも,長芋,ナガイモ,山芋,やまいも,とろろ芋|本|500
+里芋|さといも,サトイモ|個|50
+ねぎ|ネギ,長ねぎ,長ネギ,白ねぎ,白ネギ,九条ねぎ,下仁田ねぎ|本|100
+青ねぎ|万能ねぎ,小ねぎ,あさつき,わけぎ,細ねぎ,葉ねぎ|束|100
+にら|ニラ,韮|束|100
+もやし|モヤシ,緑豆もやし,大豆もやし,豆もやし|袋|200
+セロリ|せろり|本|150
+アスパラガス|アスパラ,グリーンアスパラ,ホワイトアスパラ|束|100
+オクラ|おくら|パック|100
+ズッキーニ|ずっきーに|本|200
+とうもろこし|トウモロコシ,スイートコーン,生コーン,焼きとうもろこし|本|300
+枝豆|えだまめ,エダマメ|袋|200
+さやいんげん|いんげん,インゲン,さやインゲン|袋|100
+スナップえんどう|スナップエンドウ,さやえんどう,絹さや,きぬさや,スナックエンドウ|袋|100
+かぶ|カブ,蕪|個|100
+ゴーヤ|にがうり,ニガウリ,苦瓜,ゴーヤー|本|250
+しょうが|ショウガ,生姜,ジンジャー,新しょうが|個|個:30,片:15
+にんにく|ニンニク,大蒜,ガーリック,国産にんにく|個|個:50,玉:50,片:5
+みょうが|ミョウガ,茗荷|個|15
+大葉|おおば,しそ,シソ,青じそ,青シソ,紫蘇,大葉じそ|パック|パック:5,枚:0.5
+みつば|三つ葉,ミツバ|束|30
+パセリ|ぱせり|束|50
+バジル|ばじる,バジリコ,スイートバジル|パック|20
+パクチー|香菜,コリアンダー,シャンチー,パクチ|束|30
+水菜|みずな,ミズナ,京水菜|袋|200
+春菊|しゅんぎく,シュンギク|束|200
+チンゲン菜|ちんげんさい,青梗菜,チンゲンサイ,チンゲン|株|100
+かいわれ大根|かいわれ,貝割れ,カイワレ,貝割れ大根|パック|50
+ししとう|シシトウ,獅子唐|パック|80
+ベビーリーフ|べびーりーふ|袋|40
+たけのこ|筍,タケノコ,水煮たけのこ,たけのこ水煮|袋|150
+ミックスベジタブル|ミックスベジ,冷凍ミックスベジタブル,冷凍ミックスベジ|袋|300
+しいたけ|シイタケ,椎茸,生しいたけ,生椎茸|パック|パック:100,個:15
+しめじ|シメジ,ぶなしめじ,ブナシメジ,本しめじ,ほんしめじ|パック|100
+えのき|エノキ,えのき茸,えのきたけ,エノキダケ|袋|袋:200,株:200
+エリンギ|えりんぎ|パック|パック:100,本:50
+まいたけ|マイタケ,舞茸|パック|100
+マッシュルーム|まっしゅるーむ,ブラウンマッシュルーム,ホワイトマッシュルーム|パック|パック:100,個:15
+なめこ|ナメコ|袋|100
+鶏もも肉|若どりもも,若鶏もも,とりもも,鶏もも,チキンもも,鶏モモ,鶏モモ肉,鶏もも正肉|g|枚:250
+鶏むね肉|若どりむね,若鶏むね,とりむね,鶏むね,鶏ムネ,チキンむね,鶏ムネ肉|g|枚:250
+鶏ささみ|ささみ,ササミ,若どりささみ,ささ身|g|0
+鶏手羽先|手羽先,てばさき|g|0
+鶏手羽元|手羽元,てばもと|g|0
+鶏ひき肉|とりひき肉,鶏挽肉,鶏ミンチ,若どりひき肉,鶏ひき|g|0
+鶏肉|とり肉,とりにく,チキン,国産鶏|g|0
+豚バラ肉|豚バラ,ぶたばら,豚ばら,豚バラ薄切り,豚バラスライス,バラ肉,豚バラブロック|g|0
+豚こま肉|豚こま,豚こま切れ,こま切れ,豚小間,豚こまぎれ|g|0
+豚ロース肉|豚ロース,ぶたロース,豚ロース薄切り,とんかつ用,しょうが焼き用|g|0
+豚もも肉|豚もも,豚モモ|g|0
+豚肩ロース|肩ロース,豚肩ロース肉|g|0
+豚ひき肉|豚挽肉,豚ミンチ,ぶたひき肉,豚ひき|g|0
+豚肉|ぶた肉,ぶたにく,ポーク|g|0
+牛バラ肉|牛バラ,カルビ,牛ばら,牛カルビ|g|0
+牛こま肉|牛こま,牛こま切れ,牛小間,牛切り落とし,切り落とし|g|0
+牛ひき肉|牛挽肉,牛ミンチ,牛ひき|g|0
+牛肉|ぎゅう肉,ぎゅうにく,ビーフ,牛薄切り|g|0
+合いびき肉|合挽肉,あいびき肉,合い挽き肉,合挽き肉,ミンチ,ひき肉,合挽|g|0
+ステーキ肉|ステーキ,ミスジ,サーロイン,リブロース,ヒレ肉,牛ステーキ|g|0
+ベーコン|べーこん,ハーフベーコン,厚切りベーコン,ブロックベーコン|パック|パック:90,枚:15
+ハム|はむ,ロースハム,ボンレスハム,生ハム|パック|パック:60,枚:12
+ウインナー|ウィンナー,ソーセージ,あらびきウインナー,フランクフルト,ウインナーソーセージ|パック|パック:120,本:20
+鮭|さけ,サケ,しゃけ,生鮭,銀鮭,サーモン,塩鮭,甘塩鮭,鮭切身|切れ|80
+さば|サバ,鯖,塩さば,塩サバ,さば切身|切れ|切れ:80,枚:150
+ぶり|ブリ,鰤,ぶり切身|切れ|100
+たら|タラ,鱈,生たら,真だら,たら切身|切れ|80
+たい|鯛,タイ,真鯛|切れ|80
+あじ|アジ,鯵,真あじ,まあじ|尾|100
+いわし|イワシ,鰯,真いわし|尾|80
+さんま|サンマ,秋刀魚|尾|150
+かつお|カツオ,鰹,かつおたたき|g|0
+まぐろ|マグロ,鮪,刺身まぐろ,まぐろ赤身,中とろ|g|0
+えび|エビ,海老,むきえび,バナメイエビ,ブラックタイガー,有頭えび|g|0
+いか|イカ,烏賊,するめいか,やりいか,いか刺身|杯|300
+たこ|タコ,蛸,ゆでだこ,ゆでタコ|g|0
+あさり|アサリ,浅蜊,砂抜きあさり|パック|250
+ほたて|ホタテ,帆立,貝柱,ほたて貝柱,ベビーホタテ|g|0
+ツナ缶|ツナ,シーチキン,ツナ缶詰,ツナ水煮,ライトツナ|缶|70
+しらす|シラス,しらす干し,ちりめん,ちりめんじゃこ,釜揚げしらす|パック|50
+明太子|めんたいこ,辛子明太子|パック|100
+ちくわ|竹輪,チクワ,焼きちくわ|袋|袋:120,本:25
+かまぼこ|カマボコ,蒲鉾,板かまぼこ|本|100
+はんぺん|ハンペン|枚|100
+卵|たまご,玉子,タマゴ,鶏卵,Mサイズ卵,L卵,Lサイズ卵,卵Mサイズ,赤玉子|個|60
+牛乳|ぎゅうにゅう,ミルク,成分無調整牛乳,低脂肪乳|ml|0
+豆乳|とうにゅう,無調整豆乳,調整豆乳|ml|0
+ヨーグルト|よーぐると,プレーンヨーグルト,無糖ヨーグルト,ギリシャヨーグルト|g|0
+バター|ばたー,有塩バター,無塩バター,食塩不使用バター,発酵バター|g|0
+チーズ|ちーず,とろけるチーズ,ピザ用チーズ,シュレッドチーズ,スライスチーズ,ベビーチーズ,プロセスチーズ,モッツァレラ,粉チーズ,パルメザン|g|0
+生クリーム|なまくりーむ,クリーム,ホイップクリーム,純生クリーム,動物性生クリーム|ml|0
+豆腐|とうふ,木綿豆腐,絹ごし豆腐,絹豆腐,絹ごし,もめん豆腐,充填豆腐|丁|丁:300,パック:300
+油揚げ|あぶらあげ,油あげ,きつね揚げ|枚|30
+厚揚げ|あつあげ,生揚げ|枚|200
+納豆|なっとう,ナットウ,ひきわり納豆,小粒納豆,極小粒納豆,大粒納豆|パック|45
+こんにゃく|コンニャク,糸こんにゃく,しらたき,白滝,板こんにゃく|枚|250
+米|こめ,お米,精米,新米,コシヒカリ,あきたこまち,ひとめぼれ,無洗米|g|0
+パスタ|ぱすた,スパゲッティ,スパゲティ,スパゲッティーニ,リングイネ,フェットチーネ,ロングパスタ,早ゆでスパゲッティ|g|0
+ペンネ|ぺんね,マカロニ,ショートパスタ,ファルファッレ,フジッリ,早ゆでペンネ,早ゆでマカロニ|g|0
+うどん|ウドン,冷凍うどん,ゆでうどん,讃岐うどん,乾麺うどん|袋|袋:200,玉:200
+そば|ソバ,蕎麦,乾麺そば,ゆでそば,そば乾麺|袋|袋:200
+中華麺|らーめん,ラーメン,生ラーメン,焼きそば麺,焼そば麺,焼きそば,焼そば|袋|袋:150,玉:150
+食パン|しょくぱん,パン,山型食パン,イギリスパン,角食パン|袋|袋:360,枚:60
+小麦粉|こむぎこ,薄力粉,強力粉,中力粉,ホットケーキミックス|g|0
+片栗粉|かたくりこ|g|0
+パン粉|ぱんこ,生パン粉,乾燥パン粉|g|0
+オートミール|おーとみーる|g|0
+餅|もち,切り餅,切餅,丸餅,角餅|個|50
+春雨|はるさめ|g|0
+りんご|リンゴ,林檎,ふじ,サンふじ|個|250
+バナナ|ばなな|本|本:120,房:600
+レモン|れもん,檸檬|個|100
+みかん|ミカン,蜜柑,温州みかん|個|80
+オレンジ|おれんじ,バレンシアオレンジ,ネーブル|個|200
+いちご|イチゴ,苺,ストロベリー|パック|250
+ぶどう|ブドウ,葡萄,巨峰,シャインマスカット,デラウェア|房|500
+キウイ|キウイフルーツ,きうい|個|100
+アボカド|あぼかど|個|150
+ゆず|ユズ,柚子|個|100
+すだち|スダチ|個|30
+ライム|らいむ|個|50
+梨|なし,ナシ,洋梨|個|300
+桃|もも,モモ,白桃|個|250
+柿|かき,カキ|個|200
+醤油|しょうゆ,しょう油,濃口醤油,薄口醤油,こいくち,うすくち,だし醤油,減塩醤油,濃口,薄口|ml|0
+味噌|みそ,ミソ,合わせ味噌,白味噌,赤味噌,信州味噌,減塩みそ,米みそ,合わせみそ|g|0
+みりん|ミリン,本みりん,味醂,みりん風調味料|ml|0
+料理酒|りょうりしゅ,酒,日本酒,清酒,料理用清酒|ml|0
+酢|す,米酢,穀物酢,りんご酢,黒酢,お酢,リンゴ酢,純米酢|ml|0
+ポン酢|ぽんず,ぽん酢,ポン酢醤油,ゆずポン酢|ml|0
+砂糖|さとう,上白糖,グラニュー糖,きび砂糖,三温糖,てんさい糖,ざらめ,粉砂糖,黒砂糖|g|0
+塩|しお,食塩,あら塩,粗塩,天然塩,岩塩,食卓塩,精製塩|g|0
+塩こしょう|塩コショウ,塩胡椒,塩こしょう,塩こしょう|g|0
+こしょう|胡椒,コショウ,黒こしょう,黒胡椒,白こしょう,白胡椒,ブラックペッパー,粗びき黒こしょう|g|0
+サラダ油|さらだ油,サラダオイル,植物油,菜種油,なたね油,キャノーラ油,油|ml|0
+オリーブオイル|オリーブ油,エクストラバージンオリーブオイル,EXVオリーブオイル,エクストラバージン,オリーブ|ml|0
+ごま油|ゴマ油,胡麻油,純正ごま油,太白ごま油|ml|0
+マヨネーズ|まよねーず,マヨ,キユーピーマヨネーズ|g|0
+ケチャップ|けちゃっぷ,トマトケチャップ|g|0
+ソース|そーす,ウスターソース,中濃ソース,とんかつソース,お好みソース,濃厚ソース,焼きそばソース|ml|0
+めんつゆ|麺つゆ,つゆ,そばつゆ,三倍濃縮めんつゆ,3倍濃縮めんつゆ,白だし,白出汁|ml|0
+だし|出汁,ダシ,和風だし,かつおだし,顆粒だし,ほんだし,だしの素,昆布だし,あごだし,だしパック|g|0
+鶏ガラスープの素|鶏がらスープ,鶏ガラ,中華だし,ウェイパー,味覇,鶏がらスープの素,中華スープの素|g|0
+コンソメ|こんそめ,洋風だし,固形コンソメ,顆粒コンソメ,ブイヨン|g|0
+カレールウ|カレールー,バーモントカレー,ジャワカレー,こくまろ,ゴールデンカレー,カレー|g|0
+シチューのルウ|シチュールウ,クリームシチュー,ホワイトシチュー,シチュー,ビーフシチュー|g|0
+カレー粉|かれーこ,カレーパウダー|g|0
+豆板醤|とうばんじゃん,トウバンジャン|g|0
+コチュジャン|こちゅじゃん|g|0
+オイスターソース|オイスター,おいすたーそーす|g|0
+はちみつ|ハチミツ,蜂蜜|g|0
+ごま|ゴマ,胡麻,白ごま,黒ごま,すりごま,いりごま,練りごま,白すりごま|g|0
+わさび|ワサビ,山葵,練りわさび,チューブわさび|g|0
+からし|カラシ,辛子,練りからし,チューブからし|g|0
+マスタード|ますたーど,粒マスタード,ディジョンマスタード,粒入りマスタード|g|0
+唐辛子|とうがらし,トウガラシ,鷹の爪,赤唐辛子,一味,七味,一味唐辛子,七味唐辛子|g|0
+クミン|くみん,クミンシード,クミンパウダー|g|0
+ターメリック|たーめりっく,ウコン|g|0
+トマト缶|トマト水煮,ホールトマト,カットトマト,トマト缶詰,トマトピューレ,ダイスカットトマト|缶|400
+ココナッツミルク|ここなっつみるく,ココナッツミルク缶,ココナツミルク|缶|400
+わかめ|ワカメ,乾燥わかめ,カットわかめ,生わかめ|g|0
+のり|海苔,焼きのり,焼き海苔,味付けのり,韓国のり|枚|3
+昆布|こんぶ,コンブ,だし昆布,とろろ昆布|g|0
+ひじき|ヒジキ,乾燥ひじき,芽ひじき|g|0
+かつお節|かつおぶし,鰹節,削り節,おかか,かつおぶし削り|g|0
+梅干し|うめぼし,梅干,練り梅|個|10
+キムチ|きむち,白菜キムチ|g|0
+コーン缶|コーン缶詰,ホールコーン,スイートコーン缶,クリームコーン|缶|120
+カットサラダ|サラダミックス,千切りキャベツ,カット野菜,サラダパック|袋|150
+`;
+const FOODS = [], FOOD_KEYS = new Map();
+/* 「ビ」と「ピ」のように,読み間違いやすい濁点・半濁点をそろえた形(読み取りの補正用) */
+const foldKana = s => kata2hira(String(s || "").normalize("NFKC")).normalize("NFD").replace(/[゙゚]/g, "").normalize("NFC").replace(/[\s・ー\-]/g, "").toLowerCase();
+for (const line of FOOD_TABLE.split("\n")) {
+  const p = line.split("|");
+  if (p.length < 4) continue;
+  const g = {};
+  if (p[3].includes(":")) for (const x of p[3].split(",")) { const [u, w] = x.split(":"); g[u] = parseFloat(w); }
+  else if (parseFloat(p[3]) > 0) g[p[2]] = parseFloat(p[3]);
+  const food = { name: p[0], unit: p[2], g };
+  FOODS.push(food);
+  for (const k of [p[0], ...(p[1] ? p[1].split(",") : [])]) { const key = foldKana(normName(k)); if (key && !FOOD_KEYS.has(key)) FOOD_KEYS.set(key, food); }
+}
+const FOOD_MODS = /(国産|輸入|[^\s]{2,4}[県道]産|解凍品|解凍|冷凍|カット|お徳用|徳用|特選|新鮮|訳あり|有機|無添加|ふるさと)/g;
+function levenshtein1(a, b) {                    // 1文字までの違いか
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0, j = 0, d = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++d > 1) return false;
+    if (a.length > b.length) i++; else if (a.length < b.length) j++; else { i++; j++; }
+  }
+  return d + (a.length - i) + (b.length - j) <= 1;
+}
+/* 品名から食材辞書の1件を探す.返り値: { food, conf } (conf: 1=完全一致 / 0.8=含む / 0.6=1文字違い) */
+function matchFood(raw) {
+  let s = String(raw || "").normalize("NFKC").replace(/[（(][^）)]*[）)]/g, "").replace(FOOD_MODS, "");
+  s = s.replace(/\d+(?:\.\d+)?\s*(?:kg|g|ml|l|個|本|枚|玉|束|丁|缶|袋|パック|入|切れ)*/gi, "");     // 「300g」「10個入」を外す
+  const key = foldKana(normName(s));
+  if (!key) return null;
+  if (FOOD_KEYS.has(key)) return { food: FOOD_KEYS.get(key), conf: 1 };
+  let best = null, bl = 0;
+  for (const [k, f] of FOOD_KEYS) {                // 辞書の語を含む(長い語を優先).2文字以下の語は短い品名のときだけ
+    if (k.length < 2) continue;
+    if (key.includes(k) && k.length / key.length >= 0.5 && k.length > bl) { best = f; bl = k.length; }
+  }
+  if (best) return { food: best, conf: 0.8 };
+  if (key.length >= 4) for (const [k, f] of FOOD_KEYS) if (k.length >= 4 && levenshtein1(key, k)) return { food: f, conf: 0.6 };
+  return null;
+}
+const FOOD_MEMO = new Map();
+const foodOf = name => {
+  const k = String(name || "");
+  if (!FOOD_MEMO.has(k)) { const m = matchFood(k); FOOD_MEMO.set(k, m && m.conf >= 0.8 ? m.food : null); }
+  return FOOD_MEMO.get(k);
+};
+/* 1つ(1個・1本・1パック…)の重さ g.  優先:値段帳に入れた重さ → 辞書の目安 */
+function unitGrams(food, unit, p) {
+  if (p && p.gpu > 0 && (!unit || unit === p.unit)) return p.gpu;
+  if (!food) return null;
+  if (unit && food.g[unit]) return food.g[unit];
+  const def = food.g[food.unit];
+  return def || null;
+}
+
 /* レシピの分量を「重さ(g)・体積(ml)・個数」のどれかにそろえる */
 function amountBase(amount, note) {
   const a = String(amount || "").trim();
@@ -975,19 +1227,20 @@ function amountBase(amount, note) {
   if (NOT_SCALED.has(unit)) return { kind: "none" };
   const w = String(note || "").match(new RegExp(`(${QTY_NUM})\\s*(kg|g|ml|mL|cc|L)`));       // 「1枚(約250g)」の重さ
   const alt = w ? { kind: /ml|mL|cc|L/.test(w[2]) ? "vol" : "mass", v: parseQty(w[1]) * (/kg|L/.test(w[2]) ? 1000 : 1) } : null;
-  return { kind: "count", v, alt };
+  return { kind: "count", v, alt, unit };
 }
 const priceKind = u => u === "g" ? "mass" : u === "ml" ? "vol" : "count";
 
 /* 食材名から,値段帳の中でいちばん合う1件を選ぶ(同じなら,メインのお店→新しい日付を優先) */
 function findPrice(name, prices, mainStore) {
-  const n = normName(name);
+  const n = normName(name), fa = foodOf(name);
   if (!n) return null;
   let best = null, bestScore = 0;
   for (const p of prices) {
     const pn = normName(p.name);
     let score = 0;
     if (pn && pn === n) score = 100;
+    else if (fa && fa === foodOf(p.name)) score = 100;                       // 「ビーマン」と「ピーマン」など,辞書で同じ食材
     else if (n.length >= 2 && pn.length >= 2 && (n.includes(pn) || pn.includes(n))) score = Math.min(n.length, pn.length) * 10;
     if (!score) continue;
     if (mainStore && p.store === mainStore) score += 5;
@@ -997,7 +1250,7 @@ function findPrice(name, prices, mainStore) {
 }
 /* 1行(1つの食材)の金額.status: ok / tiny / free / skip / unpriced / mismatch */
 function rowCost(row, factor, prices, mainStore) {
-  const out = { name: row.name, amount: row.amount, note: row.note, yen: 0, status: "ok", store: "" };
+  const out = { name: row.name, amount: row.amount, note: row.note, yen: 0, status: "ok", store: "", est: false };
   if (FREE_NAMES.has(row.name)) return { ...out, status: "free" };
   if (isDerived(row)) return { ...out, status: "skip" };
   const ab = amountBase(row.amount, row.note);
@@ -1005,13 +1258,18 @@ function rowCost(row, factor, prices, mainStore) {
   if (ab.kind === "skip" || ab.kind === "none") return { ...out, status: "skip" };
   const p = findPrice(row.name, prices, mainStore);
   if (!p) return { ...out, status: "unpriced" };
-  const pk = priceKind(p.unit);
-  let q = null;
+  const pk = priceKind(p.unit), food = foodOf(row.name) || foodOf(p.name), solid = k => k === "mass" || k === "vol";
+  let q = null, est = false;
   if (ab.kind === pk) q = ab.v;
-  else if ((ab.kind === "mass" && pk === "vol") || (ab.kind === "vol" && pk === "mass")) q = ab.v;       // 水と同じくらいの重さとして計算
-  else if (ab.kind === "count" && ab.alt && pk !== "count") q = ab.alt.v;
+  else if (solid(ab.kind) && solid(pk)) q = ab.v;                                  // 水と同じくらいの重さとして計算
+  else if (ab.kind === "count" && ab.alt && pk !== "count") q = ab.alt.v;          // 「1枚(約250g)」の重さ
+  else if (solid(ab.kind) && pk === "count") { const gp = unitGrams(food, p.unit, p); if (gp) { q = ab.v / gp; est = true; } }   // g → 個
+  else if (ab.kind === "count" && solid(pk)) { const gp = unitGrams(food, ab.unit, null); if (gp) { q = ab.v * gp; est = true; } }  // 個 → g
+  if (ab.kind === "count" && pk === "count" && ab.unit && ab.unit !== p.unit && food && food.g[ab.unit] && (food.g[p.unit] || p.gpu > 0)) {
+    q = ab.v * food.g[ab.unit] / (p.gpu > 0 && !food.g[p.unit] ? p.gpu : food.g[p.unit]); est = true;       // 片 ↔ 玉 のように単位が違うとき
+  }
   if (q == null || !(p.qty > 0)) return { ...out, status: "mismatch", price: p };
-  return { ...out, yen: p.price / p.qty * q * factor, store: p.store || "", price: p };
+  return { ...out, yen: p.price / p.qty * q * factor, store: p.store || "", price: p, est };
 }
 /* レシピ全体の材料費.factor=人数の倍率 */
 function calcCost(r, factor = 1) {
@@ -1038,7 +1296,17 @@ function receiptItem(rawName, price) {
   else if (k) { qty = k[1]; guess = true; name = name.replace(k[0], ""); }
   else if (c) { qty = c[1]; unit = c[2]; guess = true; name = name.replace(c[0], ""); }
   name = name.replace(/\s+/g, " ").trim() || String(rawName).trim();
-  return { name, price, qty, unit, guess };
+  let orig = "";
+  const f = matchFood(name);                                       // 食材辞書で名前を補正(読み間違い・産地や加工の表記を外す)
+  if (f && f.conf >= 0.6) {
+    if (f.food.name !== name) orig = name;
+    name = f.food.name;
+    if (!(w || k || c)) {
+      if (f.food.unit === "g" || f.food.unit === "ml") { unit = f.food.unit; qty = ""; guess = false; }                 // 重さで売るもの:内容量は本人が入れる
+      else { unit = PRICE_UNITS.includes(f.food.unit) ? f.food.unit : "個"; qty = "1"; guess = true; }
+    }
+  }
+  return { name, price, qty, unit, guess, orig };
 }
 function pairReceipt(names, prices) {
   const items = [];
@@ -1122,16 +1390,24 @@ function openPrice(id, name) {
   $("pPrice").value = p ? p.price : "";
   $("pQty").value = p ? p.qty : "";
   $("pUnit").value = p ? p.unit : "g";
+  $("pGpu").value = p && p.gpu ? p.gpu : "";
+  updateGpuHint();
   $("pStore").value = p ? p.store : (meta.mainStore || "");
   $("pDel").hidden = !p;
   $("psheet").hidden = false;
 }
 $("pUnit").innerHTML = PRICE_UNITS.map(u => `<option>${u}</option>`).join("");
+function updateGpuHint() {
+  const f = foodOf($("pName").value), g = f && (f.g[$("pUnit").value] || f.g[f.unit]);
+  $("pGpu").placeholder = g ? `目安:${g}g(辞書)` : "空欄なら食材辞書の目安";
+}
+$("pName").addEventListener("input", updateGpuHint);
+$("pUnit").addEventListener("change", updateGpuHint);
 $("psheet").onclick = e => { if (e.target.closest("[data-ps=close]")) $("psheet").hidden = true; };
 $("pSave").onclick = () => {
   const name = $("pName").value.trim(), price = parseFloat($("pPrice").value), qty = parseFloat($("pQty").value);
   if (!name || !(price > 0) || !(qty > 0)) { alert("食材名・値段・内容量を入れてください．"); return; }
-  upsertPrice({ name, price, qty, unit: $("pUnit").value, store: $("pStore").value.trim() }, priceEditId);
+  upsertPrice({ name, price, qty, unit: $("pUnit").value, store: $("pStore").value.trim(), gpu: parseFloat($("pGpu").value) || 0 }, priceEditId);
   $("psheet").hidden = true; afterPriceChange();
 };
 $("pDel").onclick = () => {
@@ -1166,6 +1442,7 @@ function renderReceiptList(res) {
         <input type="checkbox" checked aria-label="登録する">
         <div class="rf">
           <input class="rn" list="ingNames" value="${esc(it.name)}" aria-label="品名">
+          ${it.orig ? `<div class="sm" style="margin-top:4px;color:var(--accent)">「${esc(it.orig)}」を「${esc(it.name)}」に補正しました</div>` : ""}
           <div class="rline"><input class="rp" inputmode="numeric" value="${it.price}" aria-label="値段"><span>円 ／</span>
             <input class="rq ${it.guess ? "" : "ng"}" inputmode="decimal" value="${esc(it.qty)}" aria-label="内容量">
             <select class="ru" aria-label="単位">${PRICE_UNITS.map(u => `<option ${u === it.unit ? "selected" : ""}>${u}</option>`).join("")}</select></div>
@@ -1176,16 +1453,16 @@ function renderReceiptList(res) {
 $("rParse").onclick = () => renderReceiptList(parseReceipt($("rText").value));
 $("rSave").onclick = () => {
   const store = $("rStore").value.trim();
-  let n = 0;
+  let n = 0, skipped = 0;
   for (const row of $("rList").querySelectorAll(".rit")) {
     if (!row.querySelector("input[type=checkbox]").checked) continue;
     const name = row.querySelector(".rn").value.trim(), price = parseFloat(row.querySelector(".rp").value), qty = parseFloat(row.querySelector(".rq").value);
-    if (!name || !(price > 0) || !(qty > 0)) continue;
+    if (!name || !(price > 0) || !(qty > 0)) { skipped++; continue; }
     upsertPrice({ name, price, qty, unit: row.querySelector(".ru").value, store, date: receiptDate }, null); n++;
   }
   if (store && !meta.mainStore) { meta.mainStore = store; persistMeta(); }
   $("rsheet").hidden = true;
-  toast(n ? `${n}件を値段帳に登録しました` : "登録できるものがありませんでした");
+  toast((n ? `${n}件を値段帳に登録しました` : "登録できるものがありませんでした") + (skipped ? `\n内容量が空などで${skipped}件は登録していません` : ""));
   afterPriceChange();
 };
 $("rsheet").onclick = e => {
@@ -1223,8 +1500,9 @@ function costHtml(r) {
   return `<details class="costbox">
     <summary><span>材料費の目安</span><b>約${yen(c.total)}円</b>${per ? `<span class="sm">(1人あたり約${yen(per)}円)</span>` : ""}</summary>
     <div class="sm" style="margin:6px 0">${c.covered}／${c.eligible}品の値段で計算しています${c.covered < c.eligible ? "(値段がないものは含まれていません)" : ""}．</div>
+    ${c.rows.some(x => x.est) ? '<div class="sm" style="margin:0 0 4px">※「約」がついた金額は，食材ごとの目安の重さ(例:玉ねぎ1個=約200g)で換算しています．値段帳で「1個の重さ」を直せます．</div>' : ""}
     ${c.rows.filter(x => x.status !== "skip").map(x => `<div class="crow"><span>${esc(x.name)} <small>${esc(scaleText(x.amount, viewFactor))}</small></span>${
-      x.status === "ok" ? `<b>${yen(x.yen)}円</b>`
+      x.status === "ok" ? `<b>${x.est ? "約" : ""}${yen(x.yen)}円</b>`
       : x.status === "tiny" ? '<span class="sm">少量</span>'
       : x.status === "free" ? '<span class="sm">0円</span>'
       : `<button class="btn text" data-price="${esc(x.name)}">${note[x.status]}・入れる</button>`}</div>`).join("")}
