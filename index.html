@@ -269,6 +269,22 @@
   .cr-zoom { display: flex; align-items: center; gap: 12px; font-size: 14px; white-space: nowrap; }
   .cr-zoom input { flex: 1; width: auto; background: transparent; padding: 0; min-height: 32px; border: 0; accent-color: var(--accent); }
 
+  /* 調理モード:ストーリー風(上の細い棒=進みぐあい,画面の左右をタップして前後へ) */
+  .ck-segs { display: flex; gap: 4px; padding: calc(10px + env(safe-area-inset-top)) 12px 0; max-width: 640px; width: 100%; margin: 0 auto; }
+  .ck-segs i { flex: 1; height: 3px; border-radius: 2px; background: var(--line); }
+  .ck-segs i.done { background: var(--ink); }
+  .ck-segs i.cur { background: var(--accent); }
+  #cook .ck-top { padding-top: 6px; }
+  .ck-main { position: relative; }
+  .ck-zone { position: absolute; top: 0; bottom: 0; background: transparent; border-radius: 0; }
+  .ck-zone.l { left: 0; width: 33%; }
+  .ck-zone.r { right: 0; width: 67%; }
+  .ck-zone:active { background: rgba(38,35,33,.04); }
+  .ck-near, .ck-cur { pointer-events: none; }
+  .ck-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.25); }
+  .ck-hint { flex: 1; text-align: right; font-size: 13px; color: var(--sub); align-self: center; }
+  .photo img { cursor: pointer; }
+
   .toast {
     position: fixed; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 40;
     max-width: 480px; margin: 0 auto; text-align: center; white-space: pre-line;
@@ -372,7 +388,8 @@
     <div class="pastebox">
       <label class="l" for="fPaste">AIの回答をここに貼り付け</label>
       <textarea id="fPaste" rows="5" placeholder="貼り付けると，料理名・材料・作り方・保存方法に自動で分けます"></textarea>
-      <div class="row"><button class="btn line" id="parse">もう一度，自動で分ける</button></div>
+      <div class="row"><button class="btn line" id="parse">もう一度，自動で整える</button></div>
+      <div class="row"><button class="btn" id="tidyBtn">入力欄を整える</button><button class="btn" id="fmtCopy">AIに整えてもらう</button></div>
       <div class="pnote" id="parseNote"></div>
     </div>
 
@@ -380,6 +397,10 @@
     <input id="fTitle" placeholder="例:鶏むねの味噌マヨ焼き">
     <label class="l" for="fSummary">ひとこと説明</label>
     <textarea id="fSummary" rows="2" placeholder="料理の紹介文(なくてもOK)"></textarea>
+    <div class="two">
+      <div><label class="l" for="fServings">何人分</label><input id="fServings" placeholder="例:2人分"></div>
+      <div><label class="l" for="fTime">調理時間</label><input id="fTime" placeholder="例:約20分"></div>
+    </div>
     <label class="l" for="fCountry">国・地域</label>
     <select id="fCountry"></select>
     <label class="l" for="fIngredients">材料</label>
@@ -475,52 +496,133 @@ function guessCountry(title, text) {
   return best;
 }
 
-/* ---------- AIの回答を分ける ---------- */
-const SECTION = /^(材料|食材|作り方|つくり方|手順|レシピ|調理方法|保存方法|保存|保管方法|保管|日持ち|調理のポイント|調理のコツ|調理ポイント|料理のポイント|ポイント|コツ|ワンポイント|アレンジ|栄養)\s*(?:[（(][^）)]*[）)])?\s*[】\]」』]?\s*(?:[（(][^）)]*[）)])?\s*(?:[:：]\s*(.*))?$/;
+/* ---------- AIの回答を整えて分ける ---------- */
+/* 手順: ①文章の下ごしらえ(cleanText) → ②見出しで分ける(parseRecipe) → ③材料・作り方をそろった書式にする */
+const SECTION_WORDS = "材料|食材|作り方|つくり方|手順|レシピ|調理方法|保存方法|保存|保管方法|保管|日持ち|調理のポイント|調理のコツ|調理ポイント|料理のポイント|ポイント|コツ|ワンポイント|アレンジ|栄養|メモ|Ingredients|Instructions|Directions|Method|Steps|Storage|Tips|Notes";
+const SERV = /(\d+(?:[〜~\-]\d+)?\s*人(?:分|前))/;
+const SECTION = new RegExp("^(" + SECTION_WORDS + ")\\s*(?:[（(][^）)]*[）)])?\\s*[】\\]」』]?\\s*(?:[（(][^）)]*[）)])?\\s*(?:\\d+(?:[〜~\\-]\\d+)?\\s*人(?:分|前)?[^:：]{0,6})?\\s*(?:[:：]\\s*(.*))?$", "i");
 const SECTION_KEY = {
-  材料: "ingredients", 食材: "ingredients",
-  作り方: "steps", つくり方: "steps", 手順: "steps", レシピ: "steps", 調理方法: "steps",
-  保存方法: "storage", 保存: "storage", 保管方法: "storage", 保管: "storage", 日持ち: "storage",
-  調理のポイント: "extra", 調理のコツ: "extra", 調理ポイント: "extra", 料理のポイント: "extra",
-  ポイント: "extra", コツ: "extra", ワンポイント: "extra", アレンジ: "extra", 栄養: "extra",
+  材料: "ingredients", 食材: "ingredients", ingredients: "ingredients",
+  作り方: "steps", つくり方: "steps", 手順: "steps", レシピ: "steps", 調理方法: "steps", instructions: "steps", directions: "steps", method: "steps", steps: "steps",
+  保存方法: "storage", 保存: "storage", 保管方法: "storage", 保管: "storage", 日持ち: "storage", storage: "storage",
+  調理のポイント: "extra", 調理のコツ: "extra", 調理ポイント: "extra", 料理のポイント: "extra", ポイント: "extra", コツ: "extra",
+  ワンポイント: "extra", アレンジ: "extra", 栄養: "extra", メモ: "extra", tips: "extra", notes: "extra",
 };
-const CHATTY = /^(はい|了解|もちろん|承知|わかりました|以下|こちら|それでは)/;
-const stripMark = s => s.replace(/\*\*/g, "").replace(/^[\s>#*\-■□●○◆◇▼▽◎【『「\[]+/, "").trim();
+const CHATTY = /^(はい|了解|もちろん|承知|かしこまり|わかりました|お待たせ|以下|こちら|それでは|では|ご紹介|紹介します)/;
+const TAIL_CHAT = /(ご質問|ご要望|教えてください|お知らせください|お申し付け|参考になれば|お役に立てれば|召し上がれ|作ってみてください|試してみてください|楽しんでください|いかがでしょうか|お気軽に)/;
+const EMOJI = /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}︎️​-‍⁠﻿]/gu;
+const JA = "ぁ-んァ-ヶー一-龠";
+const stripMark = s => s.replace(/\*\*/g, "").replace(/^[\s>#*\-■□●○◆◇▼▽◎・【『「\[]+/, "").trim();
 
+/* ① 文章の下ごしらえ:絵文字・マークダウン・表・点線・全角の数字などをふつうの文章にする */
+function cleanText(text) {
+  let t = String(text || "").replace(/\r\n?/g, "\n");
+  t = t.replace(/([0-9])️?⃣/g, "$1. ");                  // 1️⃣ → 1.
+  t = t.replace(EMOJI, "").replace(/⃣/g, "");
+  t = t.replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/／/g, "/").replace(/％/g, "%");
+  t = t.replace(/[①-⑳]/g, c => `${c.charCodeAt(0) - 0x245F}. `);
+  const out = [];
+  for (let line of t.split("\n")) {
+    line = line.replace(/\*\*|__|`/g, "").replace(/[ \t　]+$/g, "");
+    const tr = line.trim();
+    if (/^([-*_=]\s*){3,}$/.test(tr)) continue;                    // 区切り線
+    if (/^>/.test(tr)) line = tr.replace(/^>\s?/, "");
+    if (/^\|.*\|$/.test(tr)) {                                     // 表 → 「名前: 分量」
+      const cells = tr.slice(1, -1).split("|").map(c => c.trim());
+      if (cells.every(c => /^:?-{2,}:?$/.test(c))) continue;
+      if (/^(材料|食材|名前|項目|品名)$/.test(cells[0]) && /^(分量|量|数量|目安)/.test(cells[1] || "")) continue;
+      const [a, b, ...rest] = cells, note = rest.filter(Boolean).join("・");
+      out.push(b ? `${a}: ${b}${note ? `（${note}）` : ""}` : a);
+      continue;
+    }
+    line = line.replace(/^(.{1,30}?)\s*(?:・{2,}|…+|\.{3,}|⋯+|―{2,}|ー{3,})\s*(.+)$/, (m, a, b) =>   // 点線 → コロン(分量のときだけ)
+      /^(?:約|大さじ|小さじ|少々|適量|少し|お好み|ひとつまみ|半|\d)/.test(b) ? `${a}: ${b}` : m);
+    line = line.replace(/^(\s*)[-*•●○▪▫◦‣]\s+/, "$1・");               // 箇条書きを「・」にそろえる
+    line = line.replace(/^(\s*)(?:Step|STEP|ステップ|手順)\s*(\d+)\s*[:：.．、)）]?\s*/i, "$1$2. ");   // Step 1: → 1.
+    line = line.replace(/^(\s*)[(（](\d+)[)）]\s*/, "$1$2. ").replace(/^(\s*)(\d+)\s*[.．)）、](?!\d)\s*/, "$1$2. ");
+    out.push(line);
+  }
+  return out.join("\n");
+}
+/* 日本語の文章のなかの半角の「, . ! ? ( )」を,日本語の記号にそろえる */
+function jpPunct(s) {
+  return s
+    .replace(new RegExp(`([${JA}])\\s*,\\s*`, "g"), "$1、")
+    .replace(new RegExp(`([${JA}])\\.(?=[${JA}\\s]|$)`, "gm"), "$1。")
+    .replace(new RegExp(`([${JA}])!`, "g"), "$1！")
+    .replace(new RegExp(`([${JA}])\\?`, "g"), "$1？")
+    .replace(/\(([^()\n]*[ぁ-んァ-ヶ一-龠][^()\n]*)\)/g, "（$1）");
+}
+function tidyNotes(text) {
+  return jpPunct(String(text || "")).split("\n").map(l => l.trim()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+/* 末尾の「ぜひ作ってみてくださいね」のようなあいさつ文を落とす */
+function dropTail(lines) {
+  const a = lines.slice();
+  while (a.length) {
+    const l = stripMark(a[a.length - 1]);
+    if (!l || (l.length <= 120 && TAIL_CHAT.test(l))) a.pop(); else break;
+  }
+  return a;
+}
+function cleanTitle(raw) {
+  let s = stripMark(raw).replace(/[】』」\]]+$/, "").trim(), servings = "";
+  const m = s.match(/[（(]\s*(\d+(?:[〜~\-]\d+)?\s*人(?:分|前))\s*[）)]/);
+  if (m) { servings = m[1]; s = s.replace(m[0], "").trim(); }
+  return { title: s, servings };
+}
+
+/* ② 見出しで分ける */
 function parseRecipe(text) {
-  const out = { title: "", summary: "", ingredients: "", steps: "", storage: "", extra: "", found: [] };
+  const out = { title: "", summary: "", servings: "", time: "", ingredients: "", steps: "", storage: "", extra: "", found: [] };
+  const lines = dropTail(cleanText(text).split("\n"));
   const buf = { ingredients: [], steps: [], storage: [], extra: [] };
   const pre = [];
   let cur = null, any = false, titleLine = null;
-  for (const raw of text.replace(/\r/g, "").split("\n")) {
+  for (const raw of lines) {
     const line = raw.trim();
     if (!line) { if (cur) buf[cur].push(""); continue; }
     const c = stripMark(line);
     const m = c.match(SECTION);
     if (m) {
-      cur = SECTION_KEY[m[1]]; any = true;
+      const word = m[1];
+      cur = SECTION_KEY[word] || SECTION_KEY[word.toLowerCase()]; any = true;
+      const sv = c.match(SERV);
+      if (sv && !out.servings) out.servings = sv[1];
       if (m[2]) buf[cur].push(m[2]);
       continue;
     }
     const t = c.match(/^(?:料理名|メニュー|タイトル)\s*[:：]\s*(.+)$/);
     if (t && !out.title) { out.title = t[1].trim(); continue; }
-    if (cur) buf[cur].push(raw.replace(/\*\*/g, "").replace(/^(\s*)[*•●-]\s+/, "$1・").trimEnd());
-    else pre.push(line);
+    if (!cur) {
+      const tm = c.match(/^(?:調理時間|所要時間|目安時間|調理目安|時間)\s*[:：]\s*(.+)$/);
+      if (tm) { out.time = tm[1].trim(); continue; }
+      const sv2 = c.match(/^(?:分量|人数|何人分)\s*[:：]\s*(.+)$/) || c.match(/^(\d+(?:[〜~\-]\d+)?\s*人(?:分|前))$/);
+      if (sv2) { out.servings = sv2[1].trim(); continue; }
+    }
+    if (cur) buf[cur].push(raw.trimEnd()); else pre.push(line);
   }
   if (!out.title) {
+    const quoted = pre.find(l => CHATTY.test(stripMark(l)) && /[「『][^」』]{2,40}[」』]/.test(l));
     titleLine =
       pre.find(l => /^#{1,4}\s/.test(l)) ||
       pre.find(l => /^【.+】$/.test(l)) ||
-      pre.find(l => l.length <= 60 && !/[。！!？?]$/.test(l) && !CHATTY.test(l));
-    if (titleLine) out.title = stripMark(titleLine).replace(/[】』」\]]+$/, "");
+      quoted ||
+      pre.find(l => stripMark(l).length <= 60 && !/[。！!？?.]$/.test(l) && !CHATTY.test(stripMark(l)));
+    if (titleLine === quoted && quoted) out.title = quoted.match(/[「『]([^」』]{2,40})[」』]/)[1];
+    else if (titleLine) { const ct = cleanTitle(titleLine); out.title = ct.title; if (ct.servings && !out.servings) out.servings = ct.servings; }
+  } else {
+    const ct = cleanTitle(out.title); out.title = ct.title; if (ct.servings && !out.servings) out.servings = ct.servings;
   }
-  const rest = pre.filter(l => l !== titleLine && !CHATTY.test(l) && !/^#{1,4}\s/.test(l)).map(l => l.replace(/\*\*/g, ""));
-  if (any) out.summary = rest.join(" ");     // 料理名の下にある紹介文
-  else buf.steps = rest;                      // 見出しが1つもないときは,全部を作り方にする
-  for (const k of Object.keys(buf)) {
-    out[k] = buf[k].join("\n").replace(/\n{3,}/g, "\n\n").trim();
-    if (out[k]) out.found.push(k);
-  }
+  const rest = pre.filter(l => l !== titleLine && !CHATTY.test(stripMark(l)) && !/^#{1,4}\s/.test(l));
+  if (any) out.summary = jpPunct(rest.map(stripMark).join(" "));
+  else buf.steps = rest;                                          // 見出しが1つもないときは,全部を作り方にする
+  // ③ 材料・作り方をそろった書式にする
+  out.ingredients = serializeIngredients(ingredientRows(buf.ingredients.join("\n")));
+  out.steps = serializeSteps(parseSteps(jpPunct(buf.steps.join("\n"))));
+  out.storage = tidyNotes(buf.storage.join("\n"));
+  out.extra = tidyNotes(buf.extra.join("\n"));
+  for (const k of ["ingredients", "steps", "storage", "extra"]) if (out[k]) out.found.push(k);
   return out;
 }
 
@@ -539,53 +641,83 @@ function splitItems(text) {
   return out;
 }
 
-/* 表示用:材料を「名前/分量/補足」の行に分ける */
+/* 材料を「名前/分量/補足」の行に分ける */
 function ingredientRows(text) {
   const rows = [];
-  for (const seg of splitItems(text)) {
-    let s = seg.replace(/\*\*/g, "").replace(/^[\s・\-*•●○■□]+/, "").trim();
+  for (const seg of splitItems(cleanText(text))) {
+    let s = seg.replace(/^[\s・\-*•●○■□]+/, "").trim();
     if (!s) continue;
-    if (/^[【\[■▼].*[】\]]$/.test(s) || /[:：]$/.test(s)) { rows.push({ head: s.replace(/[【】\[\]■▼:：]/g, "") }); continue; }
-    s = s.replace(/^[A-ZＡ-Ｚ][\s　.．:：)）]+/, "");
+    if (/^[【\[■▼].*[】\]]$/.test(s) || /[:：]$/.test(s)) { rows.push({ head: s.replace(/[【】\[\]■▼:：]/g, "").trim() }); continue; }
+    s = s.replace(/^[A-Z][\s.:)）]+/, "");
     let name = s, amount = "";
     const c = s.match(/^([^:：]{1,30})[:：]\s*(.+)$/);
     if (c) { name = c[1].trim(); amount = c[2].trim(); }
     else {
-      const m = s.match(/^(.+?)[\s　]+((?:大さじ|小さじ|約|少々|適量|少し|お好み|ひとつまみ|\d|[０-９]|半|ひとかけ|全量).*)$/) || s.match(/^([^\d０-９]+?)([\d０-９].*)$/);
+      const m = s.match(/^(.+?)[\s　]+((?:大さじ|小さじ|約|少々|適量|少し|お好み|ひとつまみ|\d|半|ひとかけ|全量).*)$/) || s.match(/^([^\d]+?)(\d.*)$/);
       if (m) { name = m[1].trim(); amount = m[2].trim(); }
     }
-    const n = amount.match(/^([^（(]*)[（(](.*)[）)]\s*$/);     // 「120g（1枚）」→ 分量と補足
+    const n = amount.match(/^([^（(]*)[（(](.*)[）)]\s*$/);        // 「120g（1枚）」→ 分量と補足
     rows.push(n ? { name, amount: n[1].trim(), note: n[2].trim() } : { name, amount, note: "" });
   }
   return rows;
 }
+function serializeIngredients(rows) {
+  return rows.map(r => r.head ? `【${r.head}】`
+    : !r.amount && !r.note ? r.name
+    : !r.amount ? `${r.name}（${r.note}）`
+    : `${r.name}：${r.amount}${r.note ? `（${r.note}）` : ""}`).join("\n");
+}
 
-/* 作り方を手順の配列にする.番号つき・箇条書き・見出し(下準備など)に対応 */
+/* 作り方を手順の配列にする.番号・箇条書き・見出し(下準備など)・段落に対応 */
 function parseSteps(text) {
-  const num = /^(?:(\d+)\s*[.．、)）]|[（(](\d+)[)）]|([①-⑳]))\s*(.*)$/;
+  const num = /^(?:(\d+)\s*[.．、)）](?!\d)|[（(](\d+)[)）]|([①-⑳]))\s*(.*)$/;
   const bul = /^[・*\-•●]\s*(.*)$/;
-  const kinds = (text || "").split("\n").map(l => l.trim()).filter(Boolean).map(l => {
+  const mk = (s, group) => {
+    const lm = s.match(/^([^:：。]{2,24})[:：]\s*(.+)$/);        // 「お肉を常温に戻す: 〜」→ 見出し語と本文
+    return lm ? { lead: lm[1].trim(), text: lm[2].trim(), group } : { lead: "", text: s.trim(), group };
+  };
+  const kinds = (text || "").replace(/\r/g, "").split("\n").map(l => l.trim()).filter(Boolean).map(l => {
+    const h = l.match(/^[■▼◆]\s*(.+)$/);
+    if (h) return { t: "head", s: h[1] };
     const m = l.match(num);
-    if (m) return { t: "num", n: +(m[1] || m[2] || 0), s: m[4] };
+    if (m) return { t: "num", n: +(m[1] || m[2] || (m[3] ? m[3].charCodeAt(0) - 0x245F : 0)), s: m[4] };
     const b = l.match(bul);
     return b ? { t: "bul", s: b[1] } : { t: "txt", s: l };
   });
-  const structured = kinds.some(k => k.t !== "txt");
+  if (!kinds.some(k => k.t !== "txt")) {                          // 段落だけ:1つの段落なら文ごとに分ける
+    const units = kinds.length === 1 ? (kinds[0].s.match(/[^。！？!?]+[。！？!?]*/g) || [kinds[0].s]) : kinds.map(k => k.s);
+    return units.map(s => s.trim()).filter(Boolean).map(s => mk(s, ""));
+  }
   const steps = [];
   let group = "";
-  kinds.forEach((k, i) => {
-    const nx = kinds[i + 1];
-    const short = k.s.length <= 24 && !/[。、，,！!]/.test(k.s);
-    const heading = short && nx && (
-      (k.t === "txt" && nx.t !== "txt") ||
-      (k.t === "num" && (nx.t === "bul" || (nx.t === "num" && nx.n <= k.n)))
-    );
-    if (heading) { group = k.s; return; }
-    if (structured && k.t === "txt" && steps.length) { steps[steps.length - 1].text += " " + k.s; return; }
-    const lm = k.s.match(/^([^:：。]{2,24})[:：]\s*(.+)$/);        // 「お肉を常温に戻す: 〜」→ 見出し語と本文
-    steps.push(lm ? { lead: lm[1], text: lm[2], group } : { lead: "", text: k.s, group });
-  });
+  for (let i = 0; i < kinds.length; i++) {
+    const k = kinds[i], nx = kinds[i + 1];
+    if (k.t === "head") { group = k.s; continue; }
+    const short = k.s.length <= 24 && !/[。、，,！!？?]/.test(k.s);
+    if (k.t === "num" && short && nx && nx.t === "txt") {           // 「1. 下準備」+ 説明の段落 → 見出し語つきの手順
+      let body = nx.s, j = i + 1;
+      while (kinds[j + 1] && kinds[j + 1].t === "txt") body += " " + kinds[++j].s;
+      steps.push({ lead: k.s, text: body, group }); i = j; continue;
+    }
+    const heading = short && nx && ((k.t === "txt" && nx.t !== "txt") || (k.t === "num" && (nx.t === "bul" || (nx.t === "num" && nx.n <= k.n))));
+    if (heading) { group = k.s; continue; }
+    if (k.t === "txt") { if (steps.length) steps[steps.length - 1].text += " " + k.s; else steps.push(mk(k.s, group)); continue; }
+    steps.push(mk(k.s, group));
+  }
   return steps;
+}
+function serializeSteps(steps) {
+  const out = [];
+  let g = "";
+  steps.forEach((s, i) => {
+    if (s.group && s.group !== g) { out.push(`■ ${s.group}`); g = s.group; }
+    out.push(`${i + 1}. ${s.lead ? `${s.lead}：` : ""}${s.text}`);
+  });
+  return out.join("\n");
+}
+/* AIに文章を整えてもらうときの質問文(貼り付けた文章つき) */
+function formatPrompt(text) {
+  return `次の料理のレシピを，下の形式に整え直してください．内容は変えず，材料や手順を足したり減らしたりしないでください．\n\n【出力の形式】\n前置きや締めの言葉は不要です．次の見出しのとおりに書いてください．\n料理名:\nひとこと説明:(1文)\n材料(○人分):(1行に1つ，「食材: 分量」の形で．グループがあれば【見出し】の行を入れる)\n作り方:(番号つき．まとまりがあれば「■ 見出し」の行を入れる)\n保存方法:\nポイント:\n\n【整えるレシピ】\n${text}`;
 }
 
 /* ---------- 食材マップ ---------- */
@@ -606,13 +738,17 @@ function categorize(name) {
   for (const [cat, words] of CATS) if (words.some(w => name.includes(w))) return cat;
   return "その他";
 }
+/* 「ステーキから出た肉汁」のように,作る途中でできるもの・残りものは食材として数えない */
+const DERIVED = /(から(出|取|採|と)れ?た|で出た|で出る|から出る|の残り|残り|戻し汁|煮汁|茹で汁|ゆで汁|漬け汁|焼き汁|蒸し汁|上記|前述|先ほど|さきほど|で作った)/;
+const DERIVED_NAME = /^(肉汁|焼き汁|煮汁|茹で汁|ゆで汁|戻し汁|漬け汁|蒸し汁|残り)$/;
+function isDerived(r) {
+  return DERIVED.test(r.name) || DERIVED_NAME.test(r.name) || (/全量/.test(r.amount || "") && /汁|ソース|たれ|タレ|残り/.test(r.name));
+}
 function ingredientNames(text) {
   const names = [];
-  for (const l of splitItems(text)) {
-    let s = l.replace(/\*\*/g, "").replace(/^[\s・\-*•●○■□\d.)）]+/, "").trim();
-    if (!s || /^[【\[■▼].*[】\]]$/.test(s) || /[:：]$/.test(s)) continue;
-    s = s.replace(/^[A-ZＡ-Ｚ][\s　.．:：)）]+/, "").replace(/^[（(][^）)]*[）)]\s*/, "");
-    const name = s.split(/[\s　:：…（(\d０-９]|大さじ|小さじ|適量|少々|各/)[0].trim();
+  for (const r of ingredientRows(text)) {
+    if (r.head || isDerived(r)) continue;
+    const name = r.name.replace(/[（(].*$/, "").trim();
     if (name && name.length <= 12 && !names.includes(name)) names.push(name);
   }
   return names;
@@ -620,7 +756,7 @@ function ingredientNames(text) {
 
 /* ---------- データ ---------- */
 function normalize(r) {
-  r = { title: "", summary: "", body: "", ingredients: "", steps: "", storage: "", extra: "", memo: "", country: "", photo: "", tags: [], made: [], lastMade: "", rating: 0, again: false, ...r };
+  r = { title: "", summary: "", servings: "", time: "", body: "", ingredients: "", steps: "", storage: "", extra: "", memo: "", country: "", photo: "", tags: [], made: [], lastMade: "", rating: 0, again: false, ...r };
   if (r.body && !r.ingredients && !r.steps && !r.storage) {   // 以前の形式のレシピを分け直す
     const p = parseRecipe(r.body);
     r.ingredients = p.ingredients; r.steps = p.steps; r.storage = p.storage; r.extra = p.extra;
@@ -824,6 +960,8 @@ function openDetail(id) {
     ${r.summary ? `<p class="summary">${esc(r.summary)}</p>` : ""}
     <div class="tagline">
       ${r.country ? `<span>${FLAG[r.country] || ""} ${esc(r.country)}</span>` : ""}
+      ${r.servings ? `<span>${esc(r.servings)}</span>` : ""}
+      ${r.time ? `<span>${esc(r.time)}</span>` : ""}
       ${r.rating ? stars(r.rating) : ""}
       ${r.again ? '<span class="again">また作りたい</span>' : ""}
       ${r.tags.map(t => `<span>#${esc(t)}</span>`).join("")}
@@ -856,7 +994,7 @@ $("detailBody").onclick = e => {
   }
 };
 
-/* ---------- 調理モード ---------- */
+/* ---------- 調理モード(インスタのストーリーのように,画面をタップして前後に進む) ---------- */
 let cookRecipe = null, cookSteps = [], cookI = 0, cookSheet = false, wake = null;
 async function lockScreen() { try { wake = await navigator.wakeLock?.request("screen"); } catch { /* 画面を消さない機能が使えない端末では何もしない */ } }
 function unlockScreen() { try { wake?.release(); } catch { /* 解除に失敗しても支障なし */ } wake = null; }
@@ -874,29 +1012,35 @@ function closeCook() {
   unlockScreen();
   $("cook").classList.remove("on");
 }
+function cookGo(d) {
+  const n = cookI + d;
+  if (n < 0 || n >= cookSteps.length) return;
+  cookI = n;
+  renderCook();
+}
 function renderCook() {
   const n = cookSteps.length, last = cookI === n - 1, cur = cookSteps[cookI];
   const plain = s => (s.lead ? s.lead + "：" : "") + s.text;
   const ing = ingredientRows(cookRecipe.ingredients);
   $("cook").innerHTML = `
+    <div class="ck-segs" aria-hidden="true">${cookSteps.map((_, i) => `<i class="${i < cookI ? "done" : i === cookI ? "cur" : ""}"></i>`).join("")}</div>
     <div class="ck-top">
       <div class="t"><b>${esc(cookRecipe.title)}</b><span class="sm">手順 ${cookI + 1} / ${n}</span></div>
       <button class="x" data-ck="close" aria-label="調理モードを閉じる">✕</button>
     </div>
-    <div class="ck-prog"><i style="width:${(cookI + 1) / n * 100}%"></i></div>
     <div class="ck-main">
       ${cookI > 0 ? `<div class="ck-near">${esc(plain(cookSteps[cookI - 1]))}</div>` : ""}
       <div class="ck-cur">
         <span class="ck-num">${cookI + 1}</span>${cur.group ? `<span class="ck-group">${esc(cur.group)}</span>` : ""}<br>${stepHtml(cur)}
       </div>
       ${!last ? `<div class="ck-near">${esc(plain(cookSteps[cookI + 1]))}</div>` : ""}
+      ${cookSheet ? "" : `<button class="ck-zone l" data-ck="prev" aria-label="前の手順"></button><button class="ck-zone r" data-ck="next" aria-label="次の手順"></button>`}
     </div>
     <div class="ck-nav">
       <button class="btn mini" data-ck="ing">材料</button>
-      <button class="btn" data-ck="prev" ${cookI === 0 ? "disabled style='opacity:.4'" : ""}>‹ 前へ</button>
-      ${last ? '<button class="btn primary" data-ck="done">できた!</button>' : '<button class="btn primary" data-ck="next">次へ ›</button>'}
+      ${last ? '<button class="btn primary" data-ck="done">できた!</button>' : '<div class="ck-hint">画面の左をタップで前へ，右で次へ</div>'}
     </div>
-    ${cookSheet ? `<div class="sheet"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font:600 17px var(--serif)">材料</b><button class="btn text" data-ck="ing">閉じる</button></div>
+    ${cookSheet ? `<div class="ck-backdrop" data-ck="ing"></div><div class="sheet"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font:600 17px var(--serif)">材料</b><button class="btn text" data-ck="ing">閉じる</button></div>
       ${ing.map(ingHtml).join("")}</div>` : ""}`;
 }
 $("cook").onclick = e => {
@@ -905,12 +1049,17 @@ $("cook").onclick = e => {
   const k = e.target.closest("[data-ck]")?.dataset.ck;
   if (!k) return;
   if (k === "close") { closeCook(); show("detail"); return; }
-  if (k === "next" && cookI < cookSteps.length - 1) cookI++;
-  if (k === "prev" && cookI > 0) cookI--;
-  if (k === "ing") cookSheet = !cookSheet;
-  if (k === "done") { const r = cookRecipe; closeCook(); markMade(r); openDetail(r.id); return; }
-  renderCook();
+  if (k === "next") cookGo(1);
+  if (k === "prev") cookGo(-1);
+  if (k === "ing") { cookSheet = !cookSheet; renderCook(); }
+  if (k === "done") { const r = cookRecipe; closeCook(); markMade(r); openDetail(r.id); }
 };
+document.addEventListener("keydown", e => {            // PCでは矢印キーでも進める
+  if (!cookRecipe) return;
+  if (e.key === "ArrowRight") cookGo(1);
+  if (e.key === "ArrowLeft") cookGo(-1);
+  if (e.key === "Escape") { closeCook(); show("detail"); }
+});
 
 /* ---------- 追加・編集 ---------- */
 $("fCountry").innerHTML = `<option value="">未設定</option>` + CUISINES.map(c => `<option value="${c[0]}">${c[1]} ${c[0]}</option>`).join("");
@@ -935,6 +1084,8 @@ function openEdit(id) {
   $("parseNote").textContent = "";
   $("fTitle").value = r.title;
   $("fSummary").value = r.summary;
+  $("fServings").value = r.servings;
+  $("fTime").value = r.time;
   $("fCountry").value = r.country;
   $("fIngredients").value = r.ingredients;
   $("fSteps").value = r.steps;
@@ -956,6 +1107,8 @@ function applyParse() {
   const p = parseRecipe(text);
   if (p.title) $("fTitle").value = p.title;
   $("fSummary").value = p.summary;
+  if (p.servings) $("fServings").value = p.servings;
+  if (p.time) $("fTime").value = p.time;
   $("fIngredients").value = p.ingredients;
   $("fSteps").value = p.steps;
   $("fStorage").value = p.storage;
@@ -965,13 +1118,35 @@ function applyParse() {
   const found = (p.title ? ["料理名"] : []).concat(p.found.map(k => PART_NAME[k]));
   const missing = ["料理名", "材料", "作り方", "保存方法"].filter(n => !found.includes(n));
   $("parseNote").textContent =
-    `分けました:${found.join("・") || "なし"}` +
+    `整えて分けました:${found.join("・") || "なし"}` +
     (missing.length ? `／見つからなかった項目:${missing.join("・")}` : "") +
     (guess ? `／国・地域は「${guess}」と推測` : "") +
     "．ずれていたら下の欄で直せます．";
 }
 $("fPaste").addEventListener("paste", () => setTimeout(applyParse, 0));
 $("parse").onclick = applyParse;
+$("tidyBtn").onclick = () => {                      // いま入っている欄の文章を,そろった書式に整え直す
+  $("fSummary").value = jpPunct(cleanText($("fSummary").value)).trim();
+  $("fIngredients").value = serializeIngredients(ingredientRows($("fIngredients").value));
+  $("fSteps").value = serializeSteps(parseSteps(jpPunct(cleanText($("fSteps").value))));
+  $("fStorage").value = tidyNotes(cleanText($("fStorage").value));
+  $("fExtra").value = tidyNotes(cleanText($("fExtra").value));
+  $("parseNote").textContent = "入力欄の文章を整えました．";
+};
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch {
+    const t = document.createElement("textarea");
+    t.value = text; document.body.appendChild(t); t.select();
+    const ok = document.execCommand("copy"); t.remove(); return ok;
+  }
+}
+$("fmtCopy").onclick = async () => {                // 乱れた文章を,AIに整えてもらうための質問文をコピーする
+  const text = $("fPaste").value.trim() || ["fTitle", "fSummary", "fIngredients", "fSteps", "fStorage", "fExtra"].map(id => $(id).value.trim()).filter(Boolean).join("\n\n");
+  if (!text) { alert("整えたい文章を，上の貼り付け欄に入れてください．"); return; }
+  const ok = await copyText(formatPrompt(text));
+  $("parseNote").textContent = ok ? "質問文をコピーしました．AIに貼り，返ってきた文章を上の貼り付け欄に貼ってください．" : "コピーできませんでした．";
+};
 
 /* ---------- 写真(切り抜き) ---------- */
 let crop = null;
@@ -1064,6 +1239,7 @@ $("fPhoto").onchange = e => {
   e.target.value = "";
 };
 $("photoCrop").onclick = () => { if (photo) openCrop(photo, false); };
+$("fPhotoPreview").onclick = () => { if (photo) openCrop(photo, false); };
 $("photoDel").onclick = () => { photo = ""; drawPhoto(); };
 
 
@@ -1076,6 +1252,8 @@ $("save").onclick = () => {
   const data = {
     title, steps, photo, rating,
     summary: $("fSummary").value.trim(),
+    servings: $("fServings").value.trim(),
+    time: $("fTime").value.trim(),
     country: $("fCountry").value,
     ingredients: $("fIngredients").value.trim(),
     storage: $("fStorage").value.trim(),
@@ -1355,9 +1533,8 @@ $("aBuild").onclick = () => {
   $("aOut").scrollIntoView({ behavior: "smooth", block: "center" });
 };
 $("aCopy").onclick = async () => {
-  try { await navigator.clipboard.writeText($("aOut").value); }
-  catch { $("aOut").select(); document.execCommand("copy"); }
-  $("aNote").textContent = "コピーしました．Claudeなどに貼り付けてください．";
+  const ok = await copyText($("aOut").value);
+  $("aNote").textContent = ok ? "コピーしました．Claudeなどに貼り付けてください．" : "コピーできませんでした．";
 };
 $("aToAdd").onclick = () => { openEdit(null); $("fPaste").focus(); };
 
