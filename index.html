@@ -292,6 +292,28 @@
   .serv .sm, .serv .btn.text { white-space: nowrap; }
   .serv .btn.text { padding: 0 4px; margin-left: auto; }
 
+  /* 材料費・値段帳 */
+  .costbox { margin: 4px 0 8px; padding: 12px 14px; background: var(--soft); border-radius: 14px; }
+  details.costbox { font-size: 15px; color: var(--ink); }
+  .costbox summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; min-height: 36px; align-content: center; cursor: pointer; }
+  .costbox summary b { font: 600 20px var(--serif); color: var(--accent); }
+  .crow { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 15px; min-height: 44px; }
+  .crow small { color: var(--sub); font-size: 13px; }
+  .crow .btn.text { padding: 0 4px; color: var(--accent); font-size: 14px; min-height: 36px; }
+  .psheet { position: fixed; inset: 0; z-index: 45; display: flex; align-items: flex-end; justify-content: center; }
+  .psheet[hidden] { display: none; }
+  .ps-bk { position: absolute; inset: 0; background: rgba(0,0,0,.35); }
+  .ps-card { position: relative; width: 100%; max-width: 640px; max-height: 92%; overflow: auto; background: var(--bg); border-radius: 20px 20px 0 0; padding: 16px 16px calc(20px + env(safe-area-inset-bottom)); }
+  .ps-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font: 600 18px var(--serif); }
+  .inl { display: flex; gap: 6px; }
+  .inl select { width: 84px; flex: none; }
+  .rit { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .rit > input[type=checkbox] { width: 22px; height: 22px; min-height: 0; margin-top: 12px; accent-color: var(--accent); flex: none; }
+  .rit .rf { flex: 1; min-width: 0; }
+  .rline { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 14px; color: var(--sub); white-space: nowrap; }
+  .rline .rp { width: 84px; } .rline .rq { width: 72px; } .rline .ru { width: 76px; flex: none; }
+  .rline .rq.ng { border-color: var(--accent); background: var(--tint); }
+
   .toast {
     position: fixed; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 40;
     max-width: 480px; margin: 0 auto; text-align: center; white-space: pre-line;
@@ -450,6 +472,43 @@
   <button class="tab add" id="tabAdd" aria-label="レシピを追加"><span class="disc"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></button>
   <button class="tab" id="tabMap"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6"/><path d="M5 20c.8-3.7 3.5-5.6 7-5.6s6.2 1.9 7 5.6"/></svg>マイページ</button>
 </div></nav>
+<datalist id="storeList"></datalist>
+<datalist id="ingNames"></datalist>
+
+<!-- 値段の登録 -->
+<div id="psheet" class="psheet" hidden>
+  <div class="ps-bk" data-ps="close"></div>
+  <div class="ps-card">
+    <div class="ps-head"><b>値段を登録</b><button class="btn text" data-ps="close">閉じる</button></div>
+    <label class="l" for="pName" style="margin-top:4px">食材名</label>
+    <input id="pName" list="ingNames" placeholder="例:鶏むね肉">
+    <div class="two">
+      <div><label class="l" for="pPrice">値段(円)</label><input id="pPrice" inputmode="numeric" placeholder="258"></div>
+      <div><label class="l" for="pQty">内容量と単位</label><div class="inl"><input id="pQty" inputmode="decimal" placeholder="300"><select id="pUnit" aria-label="単位"></select></div></div>
+    </div>
+    <div class="sm" style="margin-top:6px">例:「鶏むね肉 300gで258円」なら 258 と 300 g．レシピがgで書かれているものは，gで登録すると計算できます．</div>
+    <label class="l" for="pStore">買ったお店</label>
+    <input id="pStore" list="storeList" placeholder="例:○○スーパー">
+    <div class="row"><button class="btn primary" id="pSave">保存</button><button class="btn danger" id="pDel" hidden>消す</button></div>
+  </div>
+</div>
+
+<!-- レシートから登録 -->
+<div id="rsheet" class="psheet" hidden>
+  <div class="ps-bk" data-rs="close"></div>
+  <div class="ps-card tall">
+    <div class="ps-head"><b>レシートから登録</b><button class="btn text" data-rs="close">閉じる</button></div>
+    <div class="sm">スマホでレシートの写真を開き，写っている文字をコピーして，下に貼り付けます．(iPhone:写真の文字を長押し／Android:Googleレンズで「テキスト」を選ぶ)</div>
+    <textarea id="rText" rows="6" placeholder="ここに貼り付け" style="margin-top:8px"></textarea>
+    <div class="two">
+      <div><label class="l" for="rStore">お店</label><input id="rStore" list="storeList" placeholder="例:○○スーパー"></div>
+      <div><label class="l">&nbsp;</label><button class="btn line block" id="rParse">読み取る</button></div>
+    </div>
+    <div id="rList"></div>
+    <div class="row"><button class="btn primary" id="rSave" hidden>選んだものを値段帳に登録</button></div>
+  </div>
+</div>
+
 <div id="crop"></div>
 <div id="toast" class="toast" hidden></div>
 
@@ -817,7 +876,7 @@ $("lvBtn").onclick = () => { renderMap(); show("map"); };
 /* ---------- 食材庫・レベル・XP ---------- */
 const META_KEY = "recipe-app-meta-v1";
 function loadMeta() {
-  const base = { pantry: [], xp: 0, log: [] };
+  const base = { pantry: [], xp: 0, log: [], prices: [], mainStore: "" };
   try { return { ...base, ...JSON.parse(localStorage.getItem(META_KEY)) }; } catch { return base; }
 }
 let meta = loadMeta();
@@ -880,6 +939,244 @@ function markMade(r) {
   gain(items);
 }
 
+/* ---------- 値段帳・材料費の目安 ---------- */
+/* 値段帳(meta.prices)の1件:{ id, name, price(円), qty(内容量), unit, store, date }  例:鶏むね肉 258円 / 300g */
+const PRICE_UNITS = ["g", "ml", "個", "本", "枚", "束", "袋", "丁", "玉", "缶", "株", "パック"];
+const FREE_NAMES = new Set(["水", "お湯", "湯", "氷"]);
+const TINY = /^(少々|適量|ひとつまみ|お好み|お好きな|少し|ひとかけ)/;
+const kata2hira = s => s.replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
+const NAME_ALIASES = [["醤油", "しょうゆ"], ["味噌", "みそ"], ["玉葱", "たまねぎ"], ["人参", "にんじん"], ["生姜", "しょうが"], ["胡椒", "こしょう"], ["砂糖", "さとう"],
+  ["玉子", "たまご"], ["卵", "たまご"], ["茄子", "なす"], ["大根", "だいこん"], ["馬鈴薯", "じゃがいも"], ["蒜", "にんにく"], ["牛乳", "ぎゅうにゅう"], ["豆腐", "とうふ"], ["葱", "ねぎ"]];
+const normName = s => {
+  let t = String(s || "").normalize("NFKC").replace(/[（(].*$/, "").replace(/[\s・]/g, "");
+  for (const [a, b] of NAME_ALIASES) t = t.split(a).join(b);
+  return kata2hira(t).toLowerCase();
+};
+const yen = n => Math.round(n).toLocaleString("ja-JP");
+
+/* レシピの分量を「重さ(g)・体積(ml)・個数」のどれかにそろえる */
+function amountBase(amount, note) {
+  const a = String(amount || "").trim();
+  if (!a) return { kind: "none" };
+  if (TINY.test(a)) return { kind: "tiny" };
+  if (/全量/.test(a)) return { kind: "skip" };
+  const m = a.match(new RegExp(`(半分|半(?=[個束丁玉本枚片株袋缶])|${QTY_NUM})(?:\\s*[〜~]\\s*(${QTY_NUM}))?`));
+  if (!m) return { kind: "none" };
+  let v = m[1].startsWith("半") ? 0.5 : parseQty(m[1]);
+  if (m[2]) v = (v + parseQty(m[2])) / 2;
+  const before = a.slice(0, m.index), after = a.slice(m.index + m[0].length);
+  const um = after.match(QTY_UNIT), unit = um ? um[1] : "";
+  const sp = before.match(/(大さじ|小さじ|カップ)\s*$/);
+  if (sp) return { kind: "vol", v: v * (sp[1] === "大さじ" ? 15 : sp[1] === "小さじ" ? 5 : 200) };
+  if (unit === "g") return { kind: "mass", v };
+  if (unit === "kg") return { kind: "mass", v: v * 1000 };
+  if (unit === "ml" || unit === "mL" || unit === "cc") return { kind: "vol", v };
+  if (unit === "L") return { kind: "vol", v: v * 1000 };
+  if (NOT_SCALED.has(unit)) return { kind: "none" };
+  const w = String(note || "").match(new RegExp(`(${QTY_NUM})\\s*(kg|g|ml|mL|cc|L)`));       // 「1枚(約250g)」の重さ
+  const alt = w ? { kind: /ml|mL|cc|L/.test(w[2]) ? "vol" : "mass", v: parseQty(w[1]) * (/kg|L/.test(w[2]) ? 1000 : 1) } : null;
+  return { kind: "count", v, alt };
+}
+const priceKind = u => u === "g" ? "mass" : u === "ml" ? "vol" : "count";
+
+/* 食材名から,値段帳の中でいちばん合う1件を選ぶ(同じなら,メインのお店→新しい日付を優先) */
+function findPrice(name, prices, mainStore) {
+  const n = normName(name);
+  if (!n) return null;
+  let best = null, bestScore = 0;
+  for (const p of prices) {
+    const pn = normName(p.name);
+    let score = 0;
+    if (pn && pn === n) score = 100;
+    else if (n.length >= 2 && pn.length >= 2 && (n.includes(pn) || pn.includes(n))) score = Math.min(n.length, pn.length) * 10;
+    if (!score) continue;
+    if (mainStore && p.store === mainStore) score += 5;
+    if (!best || score > bestScore || (score === bestScore && (p.date || "") > (best.date || ""))) { best = p; bestScore = score; }
+  }
+  return best;
+}
+/* 1行(1つの食材)の金額.status: ok / tiny / free / skip / unpriced / mismatch */
+function rowCost(row, factor, prices, mainStore) {
+  const out = { name: row.name, amount: row.amount, note: row.note, yen: 0, status: "ok", store: "" };
+  if (FREE_NAMES.has(row.name)) return { ...out, status: "free" };
+  if (isDerived(row)) return { ...out, status: "skip" };
+  const ab = amountBase(row.amount, row.note);
+  if (ab.kind === "tiny") return { ...out, status: "tiny" };
+  if (ab.kind === "skip" || ab.kind === "none") return { ...out, status: "skip" };
+  const p = findPrice(row.name, prices, mainStore);
+  if (!p) return { ...out, status: "unpriced" };
+  const pk = priceKind(p.unit);
+  let q = null;
+  if (ab.kind === pk) q = ab.v;
+  else if ((ab.kind === "mass" && pk === "vol") || (ab.kind === "vol" && pk === "mass")) q = ab.v;       // 水と同じくらいの重さとして計算
+  else if (ab.kind === "count" && ab.alt && pk !== "count") q = ab.alt.v;
+  if (q == null || !(p.qty > 0)) return { ...out, status: "mismatch", price: p };
+  return { ...out, yen: p.price / p.qty * q * factor, store: p.store || "", price: p };
+}
+/* レシピ全体の材料費.factor=人数の倍率 */
+function calcCost(r, factor = 1) {
+  const prices = (typeof meta !== "undefined" && meta.prices) || [], mainStore = (typeof meta !== "undefined" && meta.mainStore) || "";
+  const rows = ingredientRows(r.ingredients).filter(x => !x.head).map(x => rowCost(x, factor, prices, mainStore));
+  const eligible = rows.filter(x => x.status !== "skip");
+  const covered = eligible.filter(x => ["ok", "tiny", "free"].includes(x.status));
+  return { rows, total: rows.reduce((s, x) => s + x.yen, 0), eligible: eligible.length, covered: covered.length };
+}
+
+/* レシートの文字から「品名と値段」の候補を拾う */
+const RECEIPT_SKIP = /(合計|小計|お預|お釣|釣銭|おつり|現金|クレジット|カード|ポイント|消費税|税込|税率|内税|外税|対象|レジ|責任者|領収|電話|TEL|登録番号|番号|点数|ありがとう|いらっしゃい|値引|割引|クーポン|チャージ|\d{4}[\/年.-]\d{1,2}[\/月.-]\d{1,2}|\d{1,2}:\d{2})/i;
+function parseReceipt(text) {
+  const items = [];
+  for (let line of String(text || "").normalize("NFKC").split("\n")) {
+    line = line.replace(/[¥￥]/g, " ").replace(/\s+/g, " ").trim();
+    if (!line || RECEIPT_SKIP.test(line)) continue;
+    const m = line.match(/^(.+?)\s*(\d{1,3}(?:,\d{3})+|\d+)\s*円?\s*[*※軽ⓜ]?\s*$/);
+    if (!m) continue;
+    const price = parseInt(m[2].replace(/,/g, ""), 10);
+    if (price < 10 || price > 20000) continue;
+    let name = m[1].replace(/^[\d\s*#-]{3,}\s+/, "").replace(/[*※軽]+$/g, "").trim();          // 先頭の商品コードなどを外す
+    if (!name || /^[\d\s.,x×]+$/.test(name) || name.length > 30) continue;
+    let qty = "1", unit = "個", guess = false;
+    const w = name.match(/(\d+(?:\.\d+)?)\s*(kg|g|ml|L)\b/i), k = name.match(/(\d+)\s*(?:個|本|枚|パック|袋)?\s*入/);
+    if (w) { const x = parseFloat(w[1]), u = w[2].toLowerCase(); unit = u === "ml" || u === "l" ? "ml" : "g"; qty = String(u === "kg" || u === "l" ? x * 1000 : x); guess = true; name = name.replace(w[0], ""); }
+    else if (k) { qty = k[1]; guess = true; name = name.replace(k[0], ""); }
+    name = name.replace(/\s+/g, " ").trim() || m[1].trim();
+    items.push({ name, price, qty, unit, guess });
+  }
+  return items;
+}
+
+
+/* 値段の登録・レシート取り込みの画面 */
+let priceEditId = null;
+function refreshLists() {
+  const stores = [...new Set((meta.prices || []).map(p => p.store).filter(Boolean))];
+  $("storeList").innerHTML = stores.map(s => `<option value="${esc(s)}">`).join("");
+  const names = new Set(meta.pantry.map(p => p.name));
+  for (const r of recipes) for (const x of ingredientRows(r.ingredients)) if (!x.head) names.add(x.name.replace(/[（(].*$/, "").trim());
+  $("ingNames").innerHTML = [...names].filter(Boolean).map(s => `<option value="${esc(s)}">`).join("");
+}
+function upsertPrice(e, id) {                       // 同じ食材・お店・単位があれば,新しい値段に上書きする
+  meta.prices ??= [];
+  const t = id ? meta.prices.find(x => x.id === id)
+    : meta.prices.find(x => normName(x.name) === normName(e.name) && x.store === e.store && x.unit === e.unit);
+  if (t) Object.assign(t, e, { date: today() }); else meta.prices.push({ id: uid(), ...e, date: today() });
+  persistMeta();
+}
+function refreshIngWrap() {                          // 詳細画面の材料(材料費つき)を作り直す.チェックは残す
+  const wrap = $("ingWrap");
+  if (view !== "detail" || !wrap) return;
+  const done = [...wrap.querySelectorAll(".ing")].map(e => e.classList.contains("done"));
+  wrap.innerHTML = ingWrapHtml(recipes.find(x => x.id === current));
+  wrap.querySelectorAll(".ing").forEach((e, i) => e.classList.toggle("done", !!done[i]));
+}
+function afterPriceChange() {
+  refreshIngWrap();
+  if (view === "map") renderMap();
+}
+function openPrice(id, name) {
+  refreshLists();
+  priceEditId = id || null;
+  const p = id ? meta.prices.find(x => x.id === id) : null;
+  $("pName").value = p ? p.name : (name || "");
+  $("pPrice").value = p ? p.price : "";
+  $("pQty").value = p ? p.qty : "";
+  $("pUnit").value = p ? p.unit : "g";
+  $("pStore").value = p ? p.store : (meta.mainStore || "");
+  $("pDel").hidden = !p;
+  $("psheet").hidden = false;
+}
+$("pUnit").innerHTML = PRICE_UNITS.map(u => `<option>${u}</option>`).join("");
+$("psheet").onclick = e => { if (e.target.closest("[data-ps=close]")) $("psheet").hidden = true; };
+$("pSave").onclick = () => {
+  const name = $("pName").value.trim(), price = parseFloat($("pPrice").value), qty = parseFloat($("pQty").value);
+  if (!name || !(price > 0) || !(qty > 0)) { alert("食材名・値段・内容量を入れてください．"); return; }
+  upsertPrice({ name, price, qty, unit: $("pUnit").value, store: $("pStore").value.trim() }, priceEditId);
+  $("psheet").hidden = true; afterPriceChange();
+};
+$("pDel").onclick = () => {
+  if (!priceEditId || !confirm("この値段を値段帳から消します．よろしいですか?")) return;
+  meta.prices = meta.prices.filter(x => x.id !== priceEditId);
+  persistMeta(); $("psheet").hidden = true; afterPriceChange();
+};
+
+/* レシート取り込み:スマホで写真の文字をコピーして貼る → 品名と値段を拾う → 内容量を確かめて登録 */
+function openReceipt() {
+  refreshLists();
+  $("rText").value = ""; $("rList").innerHTML = ""; $("rSave").hidden = true;
+  $("rStore").value = meta.mainStore || "";
+  $("rsheet").hidden = false;
+}
+function renderReceiptList(items) {
+  $("rList").innerHTML = items.length
+    ? `<div class="sm" style="margin:12px 0 4px">${items.length}件見つかりました．食材でないものはチェックを外し，品名は料理で使う名前に直してください．内容量を確かめてください．</div>` +
+      items.map(it => `<div class="rit">
+        <input type="checkbox" checked aria-label="登録する">
+        <div class="rf">
+          <input class="rn" list="ingNames" value="${esc(it.name)}" aria-label="品名">
+          <div class="rline"><input class="rp" inputmode="numeric" value="${it.price}" aria-label="値段"><span>円 ／</span>
+            <input class="rq ${it.guess ? "" : "ng"}" inputmode="decimal" value="${esc(it.qty)}" aria-label="内容量">
+            <select class="ru" aria-label="単位">${PRICE_UNITS.map(u => `<option ${u === it.unit ? "selected" : ""}>${u}</option>`).join("")}</select></div>
+        </div></div>`).join("")
+    : '<div class="sm" style="margin-top:12px">値段のついた行が見つかりませんでした．文字がうまくコピーできているか見てください．</div>';
+  $("rSave").hidden = !items.length;
+}
+$("rParse").onclick = () => renderReceiptList(parseReceipt($("rText").value));
+$("rSave").onclick = () => {
+  const store = $("rStore").value.trim();
+  let n = 0;
+  for (const row of $("rList").querySelectorAll(".rit")) {
+    if (!row.querySelector("input[type=checkbox]").checked) continue;
+    const name = row.querySelector(".rn").value.trim(), price = parseFloat(row.querySelector(".rp").value), qty = parseFloat(row.querySelector(".rq").value);
+    if (!name || !(price > 0) || !(qty > 0)) continue;
+    upsertPrice({ name, price, qty, unit: row.querySelector(".ru").value, store }, null); n++;
+  }
+  if (store && !meta.mainStore) { meta.mainStore = store; persistMeta(); }
+  $("rsheet").hidden = true;
+  toast(n ? `${n}件を値段帳に登録しました` : "登録できるものがありませんでした");
+  afterPriceChange();
+};
+$("rsheet").onclick = e => { if (e.target.closest("[data-rs=close]")) $("rsheet").hidden = true; };
+
+/* マイページの「値段帳」 */
+function pricesAccordionHtml() {
+  const list = (meta.prices || []).slice().sort((a, b) => normName(a.name).localeCompare(normName(b.name), "ja"));
+  return `<details class="acc" data-k="prices" ${myOpen.prices ? "open" : ""}>
+    <summary><span class="at">値段帳</span><span class="av"><b>${list.length}</b> 件</span></summary>
+    <div class="accbody">
+      <div class="sm" style="margin-bottom:8px">よく行くスーパーの値段を入れると，レシピに材料費の目安が出ます．</div>
+      <label class="l" for="mainStore" style="margin-top:0">メインのスーパー(値段が複数あるときに優先します)</label>
+      <input id="mainStore" list="storeList" value="${esc(meta.mainStore || "")}" placeholder="例:○○スーパー">
+      <div class="row"><button class="btn primary" id="addPrice">＋ 値段を追加</button><button class="btn line" id="openReceipt">レシート登録</button></div>
+      <div style="margin-top:12px">${list.map(p => `<button class="rrow" data-pe="${p.id}"><span>${esc(p.name)}${p.store ? `<small class="sm"> ・ ${esc(p.store)}</small>` : ""}</span><span class="sm">${yen(p.price)}円 / ${p.qty}${p.unit}</span></button>`).join("") || '<div class="sm">まだありません</div>'}</div>
+    </div></details>`;
+}
+$("mapBody").addEventListener("input", e => { if (e.target.id === "mainStore") { meta.mainStore = e.target.value.trim(); persistMeta(); } });
+
+/* 詳細画面の「材料費の目安」と,一覧のカードの金額 */
+function costHtml(r) {
+  if (!(meta.prices || []).length)
+    return `<div class="costbox"><span class="sm">値段帳に食材の値段を入れると，材料費の目安が出ます．</span><button class="btn text" data-act="prices">値段帳をひらく</button></div>`;
+  const c = calcCost(r, viewFactor), base = parseServings(r.servings), n = viewServ || (base && base.n);
+  const per = base && n ? c.total / n : 0;
+  const note = { unpriced: "値段なし", mismatch: "単位が合いません" };
+  return `<details class="costbox">
+    <summary><span>材料費の目安</span><b>約${yen(c.total)}円</b>${per ? `<span class="sm">(1人あたり約${yen(per)}円)</span>` : ""}</summary>
+    <div class="sm" style="margin:6px 0">${c.covered}／${c.eligible}品の値段で計算しています${c.covered < c.eligible ? "(値段がないものは含まれていません)" : ""}．</div>
+    ${c.rows.filter(x => x.status !== "skip").map(x => `<div class="crow"><span>${esc(x.name)} <small>${esc(scaleText(x.amount, viewFactor))}</small></span>${
+      x.status === "ok" ? `<b>${yen(x.yen)}円</b>`
+      : x.status === "tiny" ? '<span class="sm">少量</span>'
+      : x.status === "free" ? '<span class="sm">0円</span>'
+      : `<button class="btn text" data-price="${esc(x.name)}">${note[x.status]}・入れる</button>`}</div>`).join("")}
+  </details>`;
+}
+function costTag(r) {
+  const base = parseServings(r.servings);
+  if (!base || !(meta.prices || []).length) return "";
+  const c = calcCost(r, 1);
+  if (!c.eligible || c.covered / c.eligible < 0.7) return "";            // 値段が分かる食材が少ないときは出さない
+  return `<div class="sm">約${yen(c.total / base.n)}円/${base.unit.replace(/(分|前)$/, "")}</div>`;
+}
+
 /* ---------- 一覧 ---------- */
 function renderFilters() {
   const tags = [...new Set(recipes.flatMap(r => r.tags))].sort();
@@ -920,6 +1217,7 @@ function renderList() {
       <div class="ph">${r.photo ? `<img src="${r.photo}" alt="">` : `<span>${esc([...r.title][0] || "")}</span>`}</div>
       <h3>${esc(r.title)}</h3>
       <div class="sm">${r.country ? `${FLAG[r.country] || ""} ${esc(r.country)} ・ ` : ""}${r.made.length ? `${r.made.length}回作った` : "気になる"}</div>
+      ${costTag(r)}
       <div>${r.rating ? stars(r.rating) : ""}${r.again ? ' <span class="sm accent" style="font-weight:600">また作る</span>' : ""}</div>
     </button>`).join("")}</div>`;
 }
@@ -989,14 +1287,14 @@ const ingHtml = i => i.head
 function ingWrapHtml(r) {
   const base = parseServings(r.servings);
   const rows = ingredientRows(r.ingredients).map(ingHtml).join("");
-  if (!base) return `<div class="sm" style="margin:-4px 0 8px">人数を変えて分量を計算するには，編集で「何人分」を入れてください．</div>${rows}`;
+  if (!base) return `<div class="sm" style="margin:-4px 0 8px">人数を変えて分量を計算するには，編集で「何人分」を入れてください．</div>${costHtml(r)}${rows}`;
   const n = viewServ || base.n;
   return `<div class="serv">
       <span class="sm">人数</span>
       <button data-sv="-1" aria-label="1つ減らす">−</button><b>${n}${base.unit}</b><button data-sv="1" aria-label="1つ増やす">＋</button>
       ${n !== base.n ? `<button class="btn text" data-sv="reset">元に戻す</button>` : ""}
     </div>
-    <div class="sm" style="margin:0 0 4px">${n !== base.n ? "分量を計算しなおしています(作り方の数字は変わりません)．調味料は味を見ながら加減してください．" : "タップでチェックできます．"}</div>${rows}`;
+    <div class="sm" style="margin:0 0 4px">${n !== base.n ? "分量を計算しなおしています(作り方の数字は変わりません)．調味料は味を見ながら加減してください．" : "タップでチェックできます．"}</div>${costHtml(r)}${rows}`;
 }
 function stepServ(cmd) {
   const r = recipes.find(x => x.id === current), base = parseServings(r.servings);
@@ -1061,6 +1359,9 @@ function openDetail(id) {
 $("detailBody").onclick = e => {
   const sv = e.target.closest("[data-sv]");
   if (sv) return stepServ(sv.dataset.sv);
+  const pr = e.target.closest("[data-price]");
+  if (pr) return openPrice(null, pr.dataset.price);
+  if (e.target.closest("[data-act=prices]")) { myOpen.prices = true; renderMap(); show("map"); return; }
   const id = e.target.id;
   const r = recipes.find(x => x.id === current);
   const ing = e.target.closest(".ing");
@@ -1408,7 +1709,7 @@ const CAT_INFO = {
   その他: { desc: "どのグループにも入らなかった食材．名前が長いときなどは分類できないことがある．", tip: "気になる食材は，編集で名前を短くすると分類されやすい．" },
 };
 
-let myOpen = { world: false, food: false, xp: false };
+let myOpen = { world: false, food: false, prices: false, xp: false };
 
 function myStats() {
   const cooked = recipes.filter(r => r.made.length);
@@ -1483,6 +1784,8 @@ function renderMap() {
       </div>
     </details>
 
+    ${pricesAccordionHtml()}
+
     <details class="acc" data-k="xp" ${open("xp")}>
       <summary><span class="at">レベルとXP</span><span class="av">Lv.${L}</span></summary>
       <div class="accbody sm">
@@ -1497,6 +1800,10 @@ $("mapBody").addEventListener("toggle", e => {          // 開いた・閉じた
   if (k) myOpen[k] = e.target.open;
 }, true);
 $("mapBody").onclick = e => {
+  if (e.target.closest("#addPrice")) return openPrice(null);
+  if (e.target.closest("#openReceipt")) return openReceipt();
+  const pe = e.target.closest("[data-pe]");
+  if (pe) return openPrice(pe.dataset.pe);
   const s = e.target.closest(".stamp");
   if (s) return openCountry(s.dataset.c);
   const c = e.target.closest(".cat");
@@ -1675,7 +1982,7 @@ $("file").onchange = async e => {
     if (!Array.isArray(list)) throw 0;
     if (!confirm(`${list.length}件を読み込みます．今ある${recipes.length}件は置き換わります．よろしいですか?`)) return;
     recipes = list.map(normalize); persist();
-    if (!Array.isArray(data) && data.meta) { meta = { pantry: [], xp: 0, log: [], ...data.meta }; persistMeta(); }
+    if (!Array.isArray(data) && data.meta) { meta = { pantry: [], xp: 0, log: [], prices: [], mainStore: "", ...data.meta }; persistMeta(); }
     updateBadge(); renderList();
   } catch { alert("読み込めませんでした．書き出したファイルを選んでください．"); }
   e.target.value = "";
