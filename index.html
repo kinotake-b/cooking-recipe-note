@@ -319,6 +319,12 @@
   .rhead span:nth-child(4) { grid-column: 4 / 6; }
   .ps-card.tall { padding-left: 12px; padding-right: 12px; }
 
+  /* マイページのセクション見出し(値段帳/わたしの図鑑/レベルとXP) */
+  .part { font: 600 22px/1.4 var(--serif); margin: 36px 0 2px; padding-top: 24px; border-top: 1px solid var(--line); }
+  .part.first { margin-top: 24px; padding-top: 0; border-top: 0; }
+  .pbox { margin: 12px 0 8px; padding: 14px; background: var(--soft); border-radius: 14px; }
+  .pbox input:not([type=checkbox]) { background: var(--bg); }
+
   .toast {
     position: fixed; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 40;
     max-width: 480px; margin: 0 auto; text-align: center; white-space: pre-line;
@@ -1806,18 +1812,20 @@ $("rsheet").onclick = e => {
 };
 
 /* マイページの「値段帳」 */
-function pricesAccordionHtml() {
+function pricesSectionHtml() {
   const list = (meta.prices || []).slice().sort((a, b) => normName(a.name).localeCompare(normName(b.name), "ja"));
-  return `<details class="acc" data-k="prices" ${myOpen.prices ? "open" : ""}>
-    <summary><span class="at">値段帳</span><span class="av"><b>${list.length}</b> 件</span></summary>
-    <div class="accbody">
-      <div class="sm" style="margin-bottom:8px">よく行くスーパーの値段を入れると，レシピの材料費が自分の買い物に近づきます．</div>
-      <label class="check" style="margin:0 0 10px"><input type="checkbox" id="useRef" ${meta.useRef === false ? "" : "checked"}><span>値段がない食材は，東京の平均価格で計算する</span></label>
-      <label class="l" for="mainStore" style="margin-top:0">メインのスーパー(値段が複数あるときに優先します)</label>
+  return `<h2 class="part first">値段帳</h2>
+    <div class="sm">スーパーの値段を入れると，レシピの材料費が自分の買い物に近づきます．</div>
+    <div class="pbox">
+      <label class="check" style="margin:0 0 6px"><input type="checkbox" id="useRef" ${meta.useRef === false ? "" : "checked"}><span>値段がない食材は，東京の平均価格で計算する</span></label>
+      <label class="l" for="mainStore" style="margin-top:12px">メインのスーパー(値段が複数あるときに優先します)</label>
       <input id="mainStore" list="storeList" value="${esc(meta.mainStore || "")}" placeholder="例:○○スーパー">
       <div class="row"><button class="btn primary" id="addPrice">＋ 値段を追加</button><button class="btn line" id="openReceipt">レシート登録</button></div>
-      <div style="margin-top:12px">${list.map(p => `<button class="rrow" data-pe="${p.id}"><span>${esc(p.name)}${p.store ? `<small class="sm"> ・ ${esc(p.store)}</small>` : ""}</span><span class="sm">${yen(p.price)}円 / ${p.qty}${p.unit}</span></button>`).join("") || '<div class="sm">まだありません</div>'}</div>
-    </div></details>`;
+    </div>
+    <details class="acc" data-k="prices" ${myOpen.prices ? "open" : ""}>
+      <summary><span class="at">登録した値段</span><span class="av"><b>${list.length}</b> 件</span></summary>
+      <div class="accbody">${list.map(p => `<button class="rrow" data-pe="${p.id}"><span>${esc(p.name)}${p.store ? `<small class="sm"> ・ ${esc(p.store)}</small>` : ""}</span><span class="sm">${yen(p.price)}円 / ${p.qty}${p.unit}</span></button>`).join("") || '<div class="sm">まだありません．「＋ 値段を追加」か「レシート登録」から入れられます．</div>'}</div>
+    </details>`;
 }
 $("mapBody").addEventListener("input", e => { if (e.target.id === "mainStore") { meta.mainStore = e.target.value.trim(); persistMeta(); } });
 $("mapBody").addEventListener("change", e => { if (e.target.id === "useRef") { meta.useRef = e.target.checked; persistMeta(); } });
@@ -2425,7 +2433,9 @@ function renderMap() {
       <div class="stat"><b>${recipes.length}</b><span class="sm">レシピ</span></div>
     </div>
 
-    <h2 class="sec" style="border:0;margin:28px 0 0;padding:0">わたしの図鑑</h2>
+    ${pricesSectionHtml()}
+
+    <h2 class="part">わたしの図鑑</h2>
     <div class="sm">項目をひらくと，作った記録と解説が見られます．</div>
 
     <details class="acc" data-k="world" ${open("world")}>
@@ -2458,9 +2468,7 @@ function renderMap() {
       </div>
     </details>
 
-    ${pricesAccordionHtml()}
-
-    <details class="acc" data-k="xp" ${open("xp")}>
+    <details class="acc" data-k="xp" ${open("xp")} style="margin-top:28px">
       <summary><span class="at">レベルとXP</span><span class="av">Lv.${L}</span></summary>
       <div class="accbody sm">
         <div style="margin-bottom:6px">XPのもらい方</div>
