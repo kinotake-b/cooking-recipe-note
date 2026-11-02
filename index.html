@@ -1432,6 +1432,18 @@ function receiptItem(rawName, price) {
   }
   return { name, price, qty, unit, guess, orig };
 }
+/* 並びを直す画面に出す品名を,辞書で直す(「ビーマン」→「ピーマン」,「国産若どりもも角解凍品」→「鶏もも肉」).個数・重さの表記(5本・300g)は残す */
+function fixReceiptLine(n) {
+  const it = receiptItem(n, 100);
+  if (!it || !it.orig) return n;
+  const qty = String(n).match(/\d+(?:\.\d+)?\s*(?:kg|g|ml|L|個|本|枚|玉|束|丁|缶|袋|パック)?\s*入?/i);
+  return it.name + (qty ? qty[0] : "");
+}
+/* 手で入れた名前は,濁点・半濁点の読み間違いだけを直す(「ビーマン」→「ピーマン」).「ミスジ」を勝手に別の名前にしない */
+function fixTypedName(v) {
+  const m = matchFood(v);
+  return m && m.conf === 1 && m.food.name !== v && foldKana(m.food.name) === foldKana(v) ? m.food.name : v;
+}
 function pairReceipt(names, prices) {
   const items = [];
   names.forEach((n, i) => { const it = receiptItem(n, prices[i]); if (it && prices[i] >= 10 && prices[i] <= 20000) items.push(it); });
@@ -1476,7 +1488,8 @@ function parseReceipt(text) {
   }
   const vals = itemPrices.map(p => p.v);
   if (names.length && names.length === vals.length) return { items: pairReceipt(names, vals), mismatch: false, date, store };
-  return { items: [], mismatch: names.length > 0 || vals.length > 0, names, prices: vals, date, store };
+  const fixed = [], shown = names.map(n => { const f = fixReceiptLine(n); if (f !== n) fixed.push(f.replace(/\d+(?:\.\d+)?\s*(?:kg|g|ml|L|個|本|枚|玉|束|丁|缶|袋|パック)?\s*入?$/i, "")); return f; });
+  return { items: [], mismatch: names.length > 0 || vals.length > 0, names: shown, prices: vals, fixed, date, store };
 }
 
 /* 値段の登録・レシート取り込みの画面 */
@@ -1526,6 +1539,7 @@ function updateGpuHint() {
   $("pGpu").placeholder = g ? `目安:${g}g(辞書)` : "空欄なら食材辞書の目安";
 }
 $("pName").addEventListener("input", updateGpuHint);
+$("pName").addEventListener("change", () => { $("pName").value = fixTypedName($("pName").value); updateGpuHint(); });
 for (const id of ["pStore", "rStore"]) $(id).addEventListener("change", () => { $(id).value = fixStoreName($(id).value); });   // 店名を辞書の名前に直す
 $("pUnit").addEventListener("change", updateGpuHint);
 $("psheet").onclick = e => { if (e.target.closest("[data-ps=close]")) $("psheet").hidden = true; };
@@ -1548,13 +1562,14 @@ function openReceipt() {
   $("rStore").value = meta.mainStore || "";
   $("rsheet").hidden = false;
 }
-let receiptDate = "";
+let receiptDate = "", receiptFixed = new Set();
 function renderReceiptList(res) {
   receiptDate = res.date || "";
   if (res.store && !$("rStore").value.trim()) $("rStore").value = res.store;
   if (res.mismatch) {                                  // 品名と値段の数が合わない → 並びを直してもらう
+    receiptFixed = new Set(res.fixed || []);
     $("rSave").hidden = true;
-    $("rList").innerHTML = `<div class="sm" id="rMsg" style="margin:12px 0 4px;color:var(--accent)">品名が${res.names.length}件，値段が${res.prices.length}件で，数が合いません．品名が1行にくっついているかもしれません．分けたいところで改行して，品名と値段が同じ数・同じ順になるようにしてください．</div>
+    $("rList").innerHTML = `<div class="sm" id="rMsg" style="margin:12px 0 4px;color:var(--accent)">品名が${res.names.length}件，値段が${res.prices.length}件で，数が合いません．品名が1行にくっついているかもしれません．分けたいところで改行して，品名と値段が同じ数・同じ順になるようにしてください．読み間違いは自動で直してあります．</div>
       <div class="two"><div><label class="l" for="rNames">品名(1行に1つ)</label><textarea id="rNames" rows="9">${esc(res.names.join("\n"))}</textarea></div>
       <div><label class="l" for="rPrices">値段(1行に1つ)</label><textarea id="rPrices" rows="9">${res.prices.join("\n")}</textarea></div></div>
       <div class="row"><button class="btn line" id="rRepair">この組み合わせで並べる</button></div>`;
@@ -1566,7 +1581,7 @@ function renderReceiptList(res) {
       <div class="rhead"><span></span><span>品名</span><span>値段(円)</span><span>内容量</span></div>` +
       items.map(it => `<div class="rit">
         <input type="checkbox" checked aria-label="登録する">
-        <input class="rn ${it.orig ? "fixed" : ""}" list="ingNames" value="${esc(it.name)}" aria-label="品名" ${it.orig ? `title="元の表記:${esc(it.orig)}"` : ""}>
+        <input class="rn ${it.orig || receiptFixed.has(it.name) ? "fixed" : ""}" list="ingNames" value="${esc(it.name)}" aria-label="品名" ${it.orig ? `title="元の表記:${esc(it.orig)}"` : ""}>
         <input class="rp" inputmode="numeric" value="${it.price}" aria-label="値段(円)">
         <input class="rq ${it.guess ? "" : "ng"}" inputmode="decimal" value="${esc(it.qty)}" aria-label="内容量">
         <select class="ru" aria-label="単位">${PRICE_UNITS.map(u => `<option ${u === it.unit ? "selected" : ""}>${u}</option>`).join("")}</select>
@@ -1574,7 +1589,8 @@ function renderReceiptList(res) {
     : '<div class="sm" style="margin-top:12px">値段のついた行が見つかりませんでした．文字がうまくコピーできているか見てください．</div>';
   $("rSave").hidden = !items.length;
 }
-$("rParse").onclick = () => renderReceiptList(parseReceipt($("rText").value));
+$("rParse").onclick = () => { receiptFixed = new Set(); renderReceiptList(parseReceipt($("rText").value)); };
+$("rList").addEventListener("change", e => { if (e.target.classList.contains("rn")) e.target.value = fixTypedName(e.target.value); });     // 手で直した品名も読み間違いを直す
 $("rSave").onclick = () => {
   const store = $("rStore").value.trim();
   let n = 0, skipped = 0;
