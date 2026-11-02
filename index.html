@@ -299,6 +299,7 @@
   .costbox summary b { font: 600 20px var(--serif); color: var(--accent); }
   .crow { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 15px; min-height: 44px; }
   .crow small { color: var(--sub); font-size: 13px; }
+  .crow .refnote { display: block; color: var(--sub); font-size: 12px; line-height: 1.4; }
   .crow .btn.text { padding: 0 4px; color: var(--accent); font-size: 14px; min-height: 36px; }
   .psheet { position: fixed; inset: 0; z-index: 45; display: flex; align-items: flex-end; justify-content: center; }
   .psheet[hidden] { display: none; }
@@ -882,7 +883,7 @@ $("lvBtn").onclick = () => { renderMap(); show("map"); };
 /* ---------- 食材庫・レベル・XP ---------- */
 const META_KEY = "recipe-app-meta-v1";
 function loadMeta() {
-  const base = { pantry: [], xp: 0, log: [], prices: [], mainStore: "" };
+  const base = { pantry: [], xp: 0, log: [], prices: [], mainStore: "", useRef: true };
   try { return { ...base, ...JSON.parse(localStorage.getItem(META_KEY)) }; } catch { return base; }
 }
 let meta = loadMeta();
@@ -1330,6 +1331,19 @@ function guessStore(lines) {
   return hasHeader && lines[0] && !/\d/.test(lines[0]) && lines[0].length <= 20 ? lines[0] + (lines[1] && /店$/.test(lines[1]) ? " " + lines[1] : "") : "";
 }
 
+/* ---------- 東京の平均価格(値段帳にないとき使う目安) ---------- */
+/* 出典:東京都総務局統計部「東京の物価」東京都区部消費者物価指数(月報) 第7表 主要品目の東京都区部小売価格(CC BY 4.0).
+   直近12か月(生鮮食品:2025年9月〜2026年8月,ほか:2025年10月〜2026年9月)のうち,値のある月の平均.
+   p=価格(円) q=その価格の量 u=単位(g/ml/個) why=統計にない食材に,近い品目の値段を使うときの説明 */
+const TOKYO_REF = {"まぐろ":{"p":546,"q":100,"u":"g"},"あじ":{"p":146,"q":100,"u":"g"},"いわし":{"p":129,"q":100,"u":"g"},"かつお":{"p":280,"q":100,"u":"g"},"鮭":{"p":545,"q":100,"u":"g"},"さば":{"p":166,"q":100,"u":"g"},"さんま":{"p":202,"q":100,"u":"g"},"たい":{"p":728,"q":100,"u":"g"},"ぶり":{"p":434,"q":100,"u":"g"},"いか":{"p":238,"q":100,"u":"g"},"たこ":{"p":566,"q":100,"u":"g"},"えび":{"p":372,"q":100,"u":"g"},"あさり":{"p":196,"q":100,"u":"g"},"ほたて":{"p":491,"q":100,"u":"g"},"キャベツ":{"p":202,"q":1000,"u":"g"},"ほうれん草":{"p":1068,"q":1000,"u":"g"},"白菜":{"p":245,"q":1000,"u":"g"},"ねぎ":{"p":858,"q":1000,"u":"g"},"レタス":{"p":473,"q":1000,"u":"g"},"もやし":{"p":179,"q":1000,"u":"g"},"ブロッコリー":{"p":722,"q":1000,"u":"g"},"アスパラガス":{"p":2515,"q":1000,"u":"g"},"さつまいも":{"p":686,"q":1000,"u":"g"},"じゃがいも":{"p":562,"q":1000,"u":"g"},"里芋":{"p":1048,"q":1000,"u":"g"},"大根":{"p":222,"q":1000,"u":"g"},"にんじん":{"p":512,"q":1000,"u":"g"},"ごぼう":{"p":1164,"q":1000,"u":"g"},"玉ねぎ":{"p":470,"q":1000,"u":"g"},"れんこん":{"p":1288,"q":1000,"u":"g"},"長いも":{"p":953,"q":1000,"u":"g"},"しょうが":{"p":2537,"q":1000,"u":"g"},"枝豆":{"p":1691,"q":1000,"u":"g"},"さやいんげん":{"p":3041,"q":1000,"u":"g"},"かぼちゃ":{"p":697,"q":1000,"u":"g"},"きゅうり":{"p":785,"q":1000,"u":"g"},"なす":{"p":797,"q":1000,"u":"g"},"トマト":{"p":973,"q":1000,"u":"g"},"ピーマン":{"p":1213,"q":1000,"u":"g"},"しいたけ":{"p":1861,"q":1000,"u":"g"},"えのき":{"p":670,"q":1000,"u":"g"},"しめじ":{"p":848,"q":1000,"u":"g"},"カットサラダ":{"p":660,"q":1000,"u":"g"},"りんご":{"p":904,"q":1000,"u":"g"},"みかん":{"p":906,"q":1000,"u":"g"},"オレンジ":{"p":717,"q":1000,"u":"g"},"ぶどう":{"p":2669,"q":1000,"u":"g"},"いちご":{"p":2483,"q":1000,"u":"g"},"バナナ":{"p":356,"q":1000,"u":"g"},"キウイ":{"p":1269,"q":1000,"u":"g"},"アボカド":{"p":1070,"q":1000,"u":"g"},"米":{"p":4854,"q":5000,"u":"g"},"食パン":{"p":544,"q":1000,"u":"g"},"うどん":{"p":637,"q":1000,"u":"g"},"パスタ":{"p":646,"q":1000,"u":"g"},"中華麺":{"p":490,"q":1000,"u":"g"},"小麦粉":{"p":368,"q":1000,"u":"g"},"餅":{"p":1081,"q":1000,"u":"g"},"ペンネ":{"p":646,"q":1000,"u":"g","why":"スパゲッティの値段"},"豚バラ肉":{"p":294,"q":100,"u":"g"},"鶏肉":{"p":160,"q":100,"u":"g"},"鶏もも肉":{"p":160,"q":100,"u":"g"},"牛肉":{"p":948,"q":100,"u":"g","why":"国産牛肉(ロース)の値段"},"豚肉":{"p":294,"q":100,"u":"g","why":"国産豚肉(バラ)の値段"},"ハム":{"p":244,"q":100,"u":"g"},"ウインナー":{"p":193,"q":100,"u":"g"},"ベーコン":{"p":267,"q":100,"u":"g"},"ステーキ肉":{"p":948,"q":100,"u":"g","why":"国産牛肉(ロース)の値段"},"牛こま肉":{"p":382,"q":100,"u":"g","why":"輸入牛肉の値段"},"牛バラ肉":{"p":382,"q":100,"u":"g","why":"輸入牛肉の値段"},"牛ひき肉":{"p":382,"q":100,"u":"g","why":"輸入牛肉の値段"},"豚こま肉":{"p":294,"q":100,"u":"g","why":"国産豚肉(バラ)の値段"},"豚ひき肉":{"p":294,"q":100,"u":"g","why":"国産豚肉(バラ)の値段"},"豚もも肉":{"p":294,"q":100,"u":"g","why":"国産豚肉(バラ)の値段"},"豚肩ロース":{"p":294,"q":100,"u":"g","why":"国産豚肉(バラ)の値段"},"豚ロース肉":{"p":294,"q":100,"u":"g","why":"国産豚肉(バラ)の値段"},"鶏むね肉":{"p":160,"q":100,"u":"g","why":"鶏もも肉の値段"},"鶏ささみ":{"p":160,"q":100,"u":"g","why":"鶏もも肉の値段"},"鶏手羽先":{"p":160,"q":100,"u":"g","why":"鶏もも肉の値段"},"鶏手羽元":{"p":160,"q":100,"u":"g","why":"鶏もも肉の値段"},"鶏ひき肉":{"p":160,"q":100,"u":"g","why":"鶏もも肉の値段"},"合いびき肉":{"p":338,"q":100,"u":"g","why":"輸入牛肉と国産豚肉(バラ)の平均"},"しらす":{"p":823,"q":100,"u":"g"},"ちくわ":{"p":138,"q":100,"u":"g"},"かまぼこ":{"p":221,"q":100,"u":"g"},"かつお節":{"p":1676,"q":100,"u":"g"},"ツナ缶":{"p":158,"q":1,"u":"個"},"わかめ":{"p":1711,"q":100,"u":"g"},"昆布":{"p":1036,"q":100,"u":"g"},"ひじき":{"p":2478,"q":100,"u":"g"},"のり":{"p":690,"q":10,"u":"個"},"牛乳":{"p":263,"q":1000,"u":"ml"},"バター":{"p":604,"q":200,"u":"g"},"チーズ":{"p":274,"q":100,"u":"g"},"ヨーグルト":{"p":194,"q":400,"u":"g"},"卵":{"p":318,"q":10,"u":"個"},"豆乳":{"p":239,"q":1000,"u":"ml"},"豆腐":{"p":293,"q":1000,"u":"g"},"油揚げ":{"p":1220,"q":1000,"u":"g"},"納豆":{"p":104,"q":142.5,"u":"g"},"こんにゃく":{"p":505,"q":1000,"u":"g"},"キムチ":{"p":1096,"q":1000,"u":"g"},"塩":{"p":129,"q":1000,"u":"g"},"醤油":{"p":313,"q":450,"u":"ml"},"味噌":{"p":426,"q":750,"u":"g"},"砂糖":{"p":279,"q":1000,"u":"g"},"酢":{"p":142,"q":500,"u":"ml"},"ソース":{"p":315,"q":500,"u":"ml"},"ケチャップ":{"p":265,"q":500,"u":"g"},"マヨネーズ":{"p":889,"q":1000,"u":"g"},"めんつゆ":{"p":316,"q":1000,"u":"ml"},"サラダ油":{"p":408,"q":978,"u":"ml"},"小松菜":{"p":1068,"q":1000,"u":"g","why":"ほうれん草の値段"},"チンゲン菜":{"p":1068,"q":1000,"u":"g","why":"ほうれん草の値段"},"春菊":{"p":1068,"q":1000,"u":"g","why":"ほうれん草の値段"},"水菜":{"p":1068,"q":1000,"u":"g","why":"ほうれん草の値段"},"エリンギ":{"p":848,"q":1000,"u":"g","why":"しめじの値段"},"まいたけ":{"p":848,"q":1000,"u":"g","why":"しめじの値段"},"なめこ":{"p":848,"q":1000,"u":"g","why":"しめじの値段"},"マッシュルーム":{"p":848,"q":1000,"u":"g","why":"しめじの値段"},"ミニトマト":{"p":973,"q":1000,"u":"g","why":"トマトの値段"},"かぶ":{"p":222,"q":1000,"u":"g","why":"大根の値段"},"青ねぎ":{"p":858,"q":1000,"u":"g","why":"ねぎの値段"},"だし":{"p":288,"q":100,"u":"g","why":"風味調味料の値段"},"鶏ガラスープの素":{"p":288,"q":100,"u":"g","why":"風味調味料の値段"},"コンソメ":{"p":288,"q":100,"u":"g","why":"風味調味料の値段"},"こしょう":{"p":190,"q":43,"u":"g","why":"香辛料の値段"},"塩こしょう":{"p":190,"q":43,"u":"g","why":"香辛料の値段"},"カレー粉":{"p":190,"q":43,"u":"g","why":"香辛料の値段"},"クミン":{"p":190,"q":43,"u":"g","why":"香辛料の値段"},"唐辛子":{"p":190,"q":43,"u":"g","why":"香辛料の値段"},"ターメリック":{"p":190,"q":43,"u":"g","why":"香辛料の値段"},"料理酒":{"p":1161,"q":2000,"u":"ml","why":"清酒の値段"}};
+const TOKYO_REF_NOTE = "東京都「東京の物価」(2025年9月〜2026年9月の東京都区部の小売価格の平均)";
+/* 値段帳にない食材の「目安の値段」(東京の平均).使うのをやめている(meta.useRef=false)ときは使わない */
+function refPrice(name) {
+  if (typeof meta !== "undefined" && meta.useRef === false) return null;
+  const f = foodOf(name), r = f && TOKYO_REF[f.name];
+  return r ? { id: "ref", name: f.name, price: r.p, qty: r.q, unit: r.u, store: "東京の平均", ref: true, why: r.why || "" } : null;
+}
+
 /* レシピの分量を「重さ(g)・体積(ml)・個数」のどれかにそろえる */
 function amountBase(amount, note) {
   const a = String(amount || "").trim();
@@ -1380,8 +1394,8 @@ function rowCost(row, factor, prices, mainStore) {
   const ab = amountBase(row.amount, row.note);
   if (ab.kind === "tiny") return { ...out, status: "tiny" };
   if (ab.kind === "skip" || ab.kind === "none") return { ...out, status: "skip" };
-  const p = findPrice(row.name, prices, mainStore);
-  if (!p) return { ...out, status: "unpriced" };
+  let p = findPrice(row.name, prices, mainStore);
+  if (!p) { p = refPrice(row.name); if (!p) return { ...out, status: "unpriced" }; }       // 値段帳にないものは東京の平均価格
   const pk = priceKind(p.unit), food = foodOf(row.name) || foodOf(p.name), solid = k => k === "mass" || k === "vol";
   let q = null, est = false;
   if (ab.kind === pk) q = ab.v;
@@ -1393,7 +1407,7 @@ function rowCost(row, factor, prices, mainStore) {
     q = ab.v * food.g[ab.unit] / (p.gpu > 0 && !food.g[p.unit] ? p.gpu : food.g[p.unit]); est = true;       // 片 ↔ 玉 のように単位が違うとき
   }
   if (q == null || !(p.qty > 0)) return { ...out, status: "mismatch", price: p };
-  return { ...out, yen: p.price / p.qty * q * factor, store: p.store || "", price: p, est };
+  return { ...out, yen: p.price / p.qty * q * factor, store: p.store || "", price: p, est, ref: !!p.ref, why: p.why || "" };
 }
 /* レシピ全体の材料費.factor=人数の倍率 */
 function calcCost(r, factor = 1) {
@@ -1401,7 +1415,7 @@ function calcCost(r, factor = 1) {
   const rows = ingredientRows(r.ingredients).filter(x => !x.head).map(x => rowCost(x, factor, prices, mainStore));
   const eligible = rows.filter(x => x.status !== "skip");
   const covered = eligible.filter(x => ["ok", "tiny", "free"].includes(x.status));
-  return { rows, total: rows.reduce((s, x) => s + x.yen, 0), eligible: eligible.length, covered: covered.length };
+  return { rows, total: rows.reduce((s, x) => s + x.yen, 0), eligible: eligible.length, covered: covered.length, refN: rows.filter(x => x.ref && x.status === "ok").length };
 }
 
 /* レシートの文字から「品名と値段」の候補を拾う.
@@ -1621,7 +1635,8 @@ function pricesAccordionHtml() {
   return `<details class="acc" data-k="prices" ${myOpen.prices ? "open" : ""}>
     <summary><span class="at">値段帳</span><span class="av"><b>${list.length}</b> 件</span></summary>
     <div class="accbody">
-      <div class="sm" style="margin-bottom:8px">よく行くスーパーの値段を入れると，レシピに材料費の目安が出ます．</div>
+      <div class="sm" style="margin-bottom:8px">よく行くスーパーの値段を入れると，レシピの材料費が自分の買い物に近づきます．</div>
+      <label class="check" style="margin:0 0 10px"><input type="checkbox" id="useRef" ${meta.useRef === false ? "" : "checked"}><span>値段がない食材は，東京の平均価格で計算する</span></label>
       <label class="l" for="mainStore" style="margin-top:0">メインのスーパー(値段が複数あるときに優先します)</label>
       <input id="mainStore" list="storeList" value="${esc(meta.mainStore || "")}" placeholder="例:○○スーパー">
       <div class="row"><button class="btn primary" id="addPrice">＋ 値段を追加</button><button class="btn line" id="openReceipt">レシート登録</button></div>
@@ -1629,21 +1644,23 @@ function pricesAccordionHtml() {
     </div></details>`;
 }
 $("mapBody").addEventListener("input", e => { if (e.target.id === "mainStore") { meta.mainStore = e.target.value.trim(); persistMeta(); } });
+$("mapBody").addEventListener("change", e => { if (e.target.id === "useRef") { meta.useRef = e.target.checked; persistMeta(); } });
 $("mapBody").addEventListener("change", e => { if (e.target.id === "mainStore") { e.target.value = fixStoreName(e.target.value); meta.mainStore = e.target.value.trim(); persistMeta(); } });
 
 /* 詳細画面の「材料費の目安」と,一覧のカードの金額 */
 function costHtml(r) {
-  if (!(meta.prices || []).length)
+  if (!(meta.prices || []).length && meta.useRef === false)
     return `<div class="costbox"><span class="sm">値段帳に食材の値段を入れると，材料費の目安が出ます．</span><button class="btn text" data-act="prices">値段帳をひらく</button></div>`;
   const c = calcCost(r, viewFactor), base = parseServings(r.servings), n = viewServ || (base && base.n);
   const per = base && n ? c.total / n : 0;
   const note = { unpriced: "値段なし", mismatch: "単位が合いません" };
   return `<details class="costbox">
     <summary><span>材料費の目安</span><b>約${yen(c.total)}円</b>${per ? `<span class="sm">(1人あたり約${yen(per)}円)</span>` : ""}</summary>
-    <div class="sm" style="margin:6px 0">${c.covered}／${c.eligible}品の値段で計算しています${c.covered < c.eligible ? "(値段がないものは含まれていません)" : ""}．</div>
-    ${c.rows.some(x => x.est) ? '<div class="sm" style="margin:0 0 4px">※「約」がついた金額は，食材ごとの目安の重さ(例:玉ねぎ1個=約200g)で換算しています．値段帳で「1個の重さ」を直せます．</div>' : ""}
-    ${c.rows.filter(x => x.status !== "skip").map(x => `<div class="crow"><span>${esc(x.name)} <small>${esc(scaleText(x.amount, viewFactor))}</small></span>${
-      x.status === "ok" ? `<b>${x.est ? "約" : ""}${yen(x.yen)}円</b>`
+    <div class="sm" style="margin:6px 0">${c.covered}／${c.eligible}品の値段で計算しています${c.refN ? `(うち${c.refN}品は東京の平均価格)` : ""}${c.covered < c.eligible ? "(値段がないものは含まれていません)" : ""}．</div>
+    ${c.rows.some(x => x.est) ? '<div class="sm" style="margin:0 0 4px">※「約」は，食材ごとの目安の重さ(例:玉ねぎ1個=約200g)で換算した金額です．値段帳で「1個の重さ」を直せます．</div>' : ""}
+    ${c.refN ? '<div class="sm" style="margin:0 0 4px">※「東京平均」は東京都区部の小売価格の平均です(出典:東京都「東京の物価」,CC BY 4.0)．値段帳に入れると，そちらを使います．</div>' : ""}
+    ${c.rows.filter(x => x.status !== "skip").map(x => `<div class="crow"><span>${esc(x.name)} <small>${esc(scaleText(x.amount, viewFactor))}</small>${x.ref ? `<small class="refnote">東京平均${x.why ? "・" + esc(x.why) : ""}</small>` : ""}</span>${
+      x.status === "ok" ? `<b>${x.est || x.ref ? "約" : ""}${yen(x.yen)}円</b>`
       : x.status === "tiny" ? '<span class="sm">少量</span>'
       : x.status === "free" ? '<span class="sm">0円</span>'
       : `<button class="btn text" data-price="${esc(x.name)}">${note[x.status]}・入れる</button>`}</div>`).join("")}
@@ -1651,7 +1668,7 @@ function costHtml(r) {
 }
 function costTag(r) {
   const base = parseServings(r.servings);
-  if (!base || !(meta.prices || []).length) return "";
+  if (!base || (!(meta.prices || []).length && meta.useRef === false)) return "";
   const c = calcCost(r, 1);
   if (!c.eligible || c.covered / c.eligible < 0.7) return "";            // 値段が分かる食材が少ないときは出さない
   return `<div class="sm">約${yen(c.total / base.n)}円/${base.unit.replace(/(分|前)$/, "")}</div>`;
@@ -2462,7 +2479,7 @@ $("file").onchange = async e => {
     if (!Array.isArray(list)) throw 0;
     if (!confirm(`${list.length}件を読み込みます．今ある${recipes.length}件は置き換わります．よろしいですか?`)) return;
     recipes = list.map(normalize); persist();
-    if (!Array.isArray(data) && data.meta) { meta = { pantry: [], xp: 0, log: [], prices: [], mainStore: "", ...data.meta }; persistMeta(); }
+    if (!Array.isArray(data) && data.meta) { meta = { pantry: [], xp: 0, log: [], prices: [], mainStore: "", useRef: true, ...data.meta }; persistMeta(); }
     updateBadge(); renderList();
   } catch { alert("読み込めませんでした．書き出したファイルを選んでください．"); }
   e.target.value = "";
