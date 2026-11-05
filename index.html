@@ -1032,7 +1032,7 @@ const FOOD_TABLE = `
 まいたけ|マイタケ,舞茸|パック|100
 マッシュルーム|まっしゅるーむ,ブラウンマッシュルーム,ホワイトマッシュルーム|パック|パック:100,個:15
 なめこ|ナメコ|袋|100
-鶏もも肉|若どりもも,若鶏もも,とりもも,鶏もも,チキンもも,鶏モモ,鶏モモ肉,鶏もも正肉|g|枚:250
+鶏もも肉|若どりもも,若鶏もも,とりもも,鶏もも,チキンもも,鶏モモ,鶏モモ肉,鶏もも正肉,唐揚げ用もも,唐揚げ用鶏もも,若どり唐揚,若どり唐揚げ用もも|g|枚:250
 鶏むね肉|若どりむね,若鶏むね,とりむね,鶏むね,鶏ムネ,チキンむね,鶏ムネ肉|g|枚:250
 鶏ささみ|ささみ,ササミ,若どりささみ,ささ身|g|0
 鶏手羽先|手羽先,てばさき|g|0
@@ -1076,7 +1076,7 @@ const FOOD_TABLE = `
 ちくわ|竹輪,チクワ,焼きちくわ|袋|袋:120,本:25
 かまぼこ|カマボコ,蒲鉾,板かまぼこ|本|100
 はんぺん|ハンペン|枚|100
-卵|たまご,玉子,タマゴ,鶏卵,Mサイズ卵,L卵,Lサイズ卵,卵Mサイズ,赤玉子|個|60
+卵|たまご,玉子,タマゴ,鶏卵,Mサイズ卵,L卵,Lサイズ卵,卵Mサイズ,赤玉子,赤たまご,赤タマゴ|個|60
 牛乳|ぎゅうにゅう,ミルク,成分無調整牛乳,低脂肪乳|ml|0
 豆乳|とうにゅう,無調整豆乳,調整豆乳|ml|0
 ヨーグルト|よーぐると,プレーンヨーグルト,無糖ヨーグルト,ギリシャヨーグルト|g|0
@@ -1121,7 +1121,7 @@ const FOOD_TABLE = `
 みりん|ミリン,本みりん,味醂,みりん風調味料|ml|0
 料理酒|りょうりしゅ,酒,日本酒,清酒,料理用清酒|ml|0
 酢|す,米酢,穀物酢,りんご酢,黒酢,お酢,リンゴ酢,純米酢|ml|0
-ポン酢|ぽんず,ぽん酢,ポン酢醤油,ゆずポン酢|ml|0
+ポン酢|ぽんず,ぽん酢,ポン酢醤油,ゆずポン酢,味ぽん,味ポン,ミツカン味ぽん|ml|0
 砂糖|さとう,上白糖,グラニュー糖,きび砂糖,三温糖,てんさい糖,ざらめ,粉砂糖,黒砂糖|g|0
 塩|しお,食塩,あら塩,粗塩,天然塩,岩塩,食卓塩,精製塩|g|0
 塩こしょう|塩コショウ,塩胡椒,塩こしょう,塩こしょう|g|0
@@ -1147,7 +1147,7 @@ const FOOD_TABLE = `
 わさび|ワサビ,山葵,練りわさび,チューブわさび|g|0
 からし|カラシ,辛子,練りからし,チューブからし|g|0
 マスタード|ますたーど,粒マスタード,ディジョンマスタード,粒入りマスタード|g|0
-唐辛子|とうがらし,トウガラシ,鷹の爪,赤唐辛子,一味,七味,一味唐辛子,七味唐辛子|g|0
+唐辛子|とうがらし,トウガラシ,鷹の爪,赤唐辛子,一味,七味,一味唐辛子,七味唐辛子,輪切り唐辛子,輪切り赤唐辛子,輪切りとうがらし|g|0
 クミン|くみん,クミンシード,クミンパウダー|g|0
 ターメリック|たーめりっく,ウコン|g|0
 トマト缶|トマト水煮,ホールトマト,カットトマト,トマト缶詰,トマトピューレ,ダイスカットトマト|缶|400
@@ -1336,6 +1336,8 @@ XO醤|エックスオージャン|g|0
 梅|うめ,青梅|g|0
 金柑|きんかん|g|0
 びわ|ビワ,枇杷|個|0
+鍋つゆ|鍋の素,鍋スープ,鍋用スープ,ちゃんこ鍋つゆ,ゆず塩鍋つゆ,しゃぶしゃぶつゆ|袋|0
+鍋用野菜セット|寄せ鍋用野菜,寄せ鍋用野,鍋用野菜,鍋野菜,鍋野菜セット,カット鍋野菜|袋|0
 `;
 const FOODS = [], FOOD_KEYS = new Map();
 /* 「ビ」と「ピ」のように,読み間違いやすい濁点・半濁点をそろえた形(読み取りの補正用) */
@@ -1350,7 +1352,7 @@ for (const line of FOOD_TABLE.split("\n")) {
   FOODS.push(food);
   for (const k of [p[0], ...(p[1] ? p[1].split(",") : [])]) { const key = foldKana(normName(k)); if (key && !FOOD_KEYS.has(key)) FOOD_KEYS.set(key, food); }
 }
-const FOOD_MODS = /(国産|輸入|[^\s]{2,4}[県道]産|解凍品|解凍|冷凍|カット|お徳用|徳用|特選|新鮮|訳あり|有機|無添加|ふるさと)/g;
+const FOOD_MODS = /(Vマーク|ＶＧＴ|VGT|トップバリュ|セブンプレミアム|ローソンセレクト|みなさまのお墨付き|スタイルワン|ベストプライス|プライムワン|国産|輸入|[^\s]{2,4}[県道]産|解凍品|解凍|冷凍|カット|お徳用|徳用|特選|新鮮|訳あり|有機|無添加|ふるさと)/g;
 function levenshtein1(a, b) {                    // 1文字までの違いか
   if (a === b) return true;
   if (Math.abs(a.length - b.length) > 1) return false;
@@ -1476,6 +1478,10 @@ function matchStoreText(text) {
   if (exact) return { name: exact.name, rest: "" };
   const words = s.split(/\s+/), first = STORE_KEYS.get(foldKana(words[0]));            // 「OK 大岡山店」のように先頭の1語が店名
   if (first && words.length > 1) return { name: first.name, rest: words.slice(1).join(" ") };
+  for (let i = words.length - 1; i >= 1; i--) {                                              // 「大岡山 Tokyu Store」のように,支店名が先で店名があと
+    const tail = STORE_KEYS.get(foldKana(words.slice(i).join(" ")));
+    if (tail) return { name: tail.name, rest: words.slice(0, i).join(" ") };
+  }
   let best = null, bl = 0;                           // 先頭が店名と同じ(長い店名を優先).3文字以上の店名だけ
   for (const [k, st] of STORE_KEYS) if (k.length >= 3 && whole.startsWith(k) && k.length > bl) { best = st; bl = k.length; }
   if (!best) {                                       // 先頭が1文字違い(読み間違い)
@@ -1602,13 +1608,13 @@ function calcCost(r, factor = 1) {
 
 /* レシートの文字から「品名と値段」の候補を拾う.
    ①1行に「品名 値段」が並ぶ形 と ②品名の列→値段の列に分かれて並ぶ形(スマホの文字コピーでよくなる形)の両方に対応 */
-const RECEIPT_SKIP = /(合計|小計|お預|お釣|釣銭|おつり|現金|クレジット|カード|ポイント|消費税|税込|税率|内税|外税|対象|レジ|責任者|領収|電話|TEL|FAX|登録番号|番号|点数|ありがとう|いらっしゃい|値引|割引|クーポン|チャージ|責[:：]|取\d{3,}|\d{4}[\/年.-]\d{1,2}[\/月.-]\d{1,2}|\d{1,2}:\d{2})/i;
+const RECEIPT_SKIP = /(責No|責\s*No|ATC|AID|MUN|取引|売上|お買|一括|控え|伝票|承認|お客様|お取扱|毎度|合計|小計|お預|お釣|釣銭|おつり|現金|クレジット|カード|ポイント|消費税|税込|税率|内税|外税|対象|レジ|責任者|領収|電話|TEL|FAX|登録番号|番号|点数|ありがとう|いらっしゃい|値引|割引|クーポン|チャージ|責[:：]|取\d{3,}|\d{4}[\/年.-]\d{1,2}[\/月.-]\d{1,2}|\d{1,2}:\d{2})/i;
 const RECEIPT_LABEL = /(小計|合計|外税|内税|対象額|消費税|税込|お預|お釣|釣銭|クレジット|現金)/;
 const RECEIPT_HEADER = /(TEL|FAX|領収|レジ|登録番号|責[:：]|取\d{3,}|\d{4}[\/年.-]\d{1,2}[\/月.-]\d{1,2}|^\d{1,2}:\d{2}$|\d{2,4}-\d{3,4}-\d{3,4})/i;
 const PRICE_ONLY = /^[·・.\s]*[¥￥]?\s*(\d{1,3}(?:,\d{3})+|\d+)\s*円?\s*([※*軽ⓜ]?)\s*$/;
 const HAS_WORD = /[A-Za-zぁ-んァ-ヶ一-龠]/;
 function receiptItem(rawName, price) {
-  let name = String(rawName).replace(/^[\d\s*#-]{3,}\s+/, "").replace(/[*※軽ⓜ]+$/g, "").trim();
+  let name = String(rawName).replace(/^[A-Z]?[*※#]*\s*\d{2,6}\s+/, "").replace(/^[\d\s*#-]{3,}\s+/, "").replace(/[*※軽ⓜ]+$/g, "").trim();
   if (!name || !HAS_WORD.test(name) || name.length > 30) return null;
   let qty = "1", unit = "個", guess = false;
   const w = name.match(/(\d+(?:\.\d+)?)\s*(kg|g|ml|L)\b/i), k = name.match(/(\d+)\s*(?:個|本|枚|パック|袋)?\s*入/), c = name.match(/(\d+)\s*(個|本|枚|玉|束|丁|缶|袋|パック)$/);
@@ -1647,16 +1653,20 @@ function pairReceipt(names, prices) {
 }
 function parseReceipt(text) {
   const norm = String(text || "").normalize("NFKC");
-  const lines = norm.split("\n").map(l => l.replace(/[¥￥]/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
+  const lines = norm.split("\n").map(l => l.replace(/[¥￥\\]/g, " ").replace(/(^|\s)Y(?=\d)/g, "$1 ").replace(/\s+/g, " ").trim()).filter(Boolean);
   const dm = norm.match(/(\d{4})[\/年.-](\d{1,2})[\/月.-](\d{1,2})/);
   const date = dm ? `${dm[1]}-${dm[2].padStart(2, "0")}-${dm[3].padStart(2, "0")}` : "";
   const store = guessStore(lines);                                              // 店名:辞書で補正(読み間違いも直す)
   // ① 1行に「品名 値段」
   const same = [];
+  let pending = "";                                          // 品名だけの行.次の行に「2コ x 単198 ¥396」のように個数×単価が続くことがある
   for (const line of lines) {
-    if (RECEIPT_SKIP.test(line)) continue;
+    const mul = line.match(/^(\d+)\s*[コ個点本袋]?\s*[xX×＊]\s*単?\s*(\d+)/);
+    if (mul && pending) { const it = receiptItem(pending, parseInt(mul[2], 10)); if (it) same.push(it); pending = ""; continue; }   // 値段は「単価」を使う
+    if (RECEIPT_SKIP.test(line)) { pending = ""; continue; }
     const m = line.match(/^(.+?)\s*(\d{1,3}(?:,\d{3})+|\d+)\s*円?\s*[*※軽ⓜ]?\s*$/);
-    if (!m) continue;
+    if (!m) { pending = HAS_WORD.test(line) && line.length <= 30 ? line : ""; continue; }
+    pending = "";
     const price = parseInt(m[2].replace(/,/g, ""), 10);
     if (price < 10 || price > 20000) continue;
     const it = receiptItem(m[1], price);
