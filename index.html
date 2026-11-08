@@ -1653,10 +1653,53 @@ function pairReceipt(names, prices) {
 }
 function parseReceipt(text) {
   const norm = String(text || "").normalize("NFKC");
-  const lines = norm.split("\n").map(l => l.replace(/[¥￥\\]/g, " ").replace(/(^|\s)Y(?=\d)/g, "$1 ").replace(/\s+/g, " ").trim()).filter(Boolean);
+  const ys = [], lines = [];                                                   // ys: その行に「¥」があったか(品名の末尾の数字を値段と間違えない手がかり)
+  norm.split("\n").forEach(raw => {
+    const l = raw.replace(/[¥￥\\]/g, " ").replace(/(^|\s)Y(?=\d)/g, "$1 ").replace(/\s+/g, " ").trim();
+    if (l) { lines.push(l); ys.push(/[¥￥\\]|(^|\s)Y\d/.test(raw)); }
+  });
+  const yenMode = ys.filter(Boolean).length >= 3;
   const dm = norm.match(/(\d{4})[\/年.-](\d{1,2})[\/月.-](\d{1,2})/);
   const date = dm ? `${dm[1]}-${dm[2].padStart(2, "0")}-${dm[3].padStart(2, "0")}` : "";
   const store = guessStore(lines);                                              // 店名:辞書で補正(読み間違いも直す)
+  // ⓪ ¥つきのレシート:上から順に「品名だけの行」をためて,値段が来たら先頭の品名と組にする(品名と値段が同じ行でも,別々の列でも,混ざっていても同じ)
+  if (yenMode) {
+    let first = 0;
+    const firstPrice = Math.max(0, lines.findIndex((l, i) => ys[i] || PRICE_ONLY.test(l)));
+    lines.forEach((l, i) => { if (i < firstPrice && !/レジ袋/.test(l) && RECEIPT_HEADER.test(l)) first = i + 1; });
+    const queue = [], unit = [], got = [], extra = [];
+    let rawSum = 0;
+    let lastQ = -1;
+    for (let i = first; i < lines.length; i++) {
+      const l = lines[i];
+      const mul = l.match(/^(\d+)\s*[コ個点本袋]?\s*[xX×＊]\s*単?\s*(\d+)/);
+      if (mul) {                                                       // 「2コ x 単198 ¥396」:直前の品名の単価.値段は単価を使う(合計の列には合計が出るので,そこは無視)
+        if (queue.length && lastQ === i - 1) {
+          if (ys[i]) { const nm = queue.pop(); unit.pop(); const it = receiptItem(nm, parseInt(mul[2], 10)); if (it) got.push(it); }   // 同じ行に合計も出ている形
+          else unit[unit.length - 1] = parseInt(mul[2], 10);                                                                   // 合計は別の列に出る形
+        }
+        continue;
+      }
+      if (!/レジ袋/.test(l) && (RECEIPT_SKIP.test(l) || RECEIPT_LABEL.test(l))) continue;     // レジ袋(¥8など)は列の数をそろえるため品名として数える
+      const po = l.match(PRICE_ONLY);
+      if (po) {
+        if (!queue.length) { extra.push(parseInt(po[1].replace(/,/g, ""), 10)); continue; }   // 品名が残っていない値段(小計など)は商品ではない
+        rawSum += parseInt(po[1].replace(/,/g, ""), 10);
+        const price = unit.shift() || parseInt(po[1].replace(/,/g, ""), 10), nm = queue.shift();
+        if (price >= 10 && price <= 20000) { const it = receiptItem(nm, price); if (it) got.push(it); }
+        continue;
+      }
+      const m = ys[i] && l.match(/^(.+?)\s*(\d{1,3}(?:,\d{3})+|\d+)\s*円?\s*[*※軽ⓜ]?\s*$/);
+      if (m) {
+        const price = parseInt(m[2].replace(/,/g, ""), 10);
+        if (price >= 10 && price <= 20000) { const it = receiptItem(m[1], price); if (it) got.push(it); }
+        continue;
+      }
+      if (HAS_WORD.test(l) && l.length <= 40) { queue.push(l.replace(/[*※軽ⓜ]+$/g, "").trim()); unit.push(0); lastQ = i; }
+    }
+    // 余った値段があるときは,最初の1つが「商品の合計(小計)」と同じ金額のときだけ信じる(合わなければ品名と値段の数がずれている)
+    if (got.length >= 2 && !queue.length && (!extra.length || extra[0] === rawSum)) return { items: got, mismatch: false, date, store };
+  }
   // ① 1行に「品名 値段」
   const same = [];
   let pending = "";                                          // 品名だけの行.次の行に「2コ x 単198 ¥396」のように個数×単価が続くことがある
