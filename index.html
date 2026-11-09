@@ -1614,7 +1614,7 @@ const RECEIPT_HEADER = /(TEL|FAX|領収|レジ|登録番号|責[:：]|取\d{3,}|
 const PRICE_ONLY = /^[·・.\s]*[¥￥]?\s*(\d{1,3}(?:,\d{3})+|\d+)\s*円?\s*([※*軽ⓜ]?)\s*$/;
 const HAS_WORD = /[A-Za-zぁ-んァ-ヶ一-龠]/;
 function receiptItem(rawName, price) {
-  let name = String(rawName).replace(/^[A-Z]?[*※#]*\s*\d{2,6}\s+/, "").replace(/^[\d\s*#-]{3,}\s+/, "").replace(/[*※軽ⓜ]+$/g, "").trim();
+  let name = String(rawName).replace(/^[A-Z]?[*※#]*\s*\d{2,6}(?:\s+|(?=[^\d\s]))/, "").replace(/^[\d\s*#-]{3,}\s+/, "").replace(/[*※軽ⓜ]+$/g, "").trim();
   if (!name || !HAS_WORD.test(name) || name.length > 30) return null;
   let qty = "1", unit = "個", guess = false;
   const w = name.match(/(\d+(?:\.\d+)?)\s*(kg|g|ml|L)\b/i), k = name.match(/(\d+)\s*(?:個|本|枚|パック|袋)?\s*入/), c = name.match(/(\d+)\s*(個|本|枚|玉|束|丁|缶|袋|パック)$/);
@@ -1654,7 +1654,8 @@ function pairReceipt(names, prices) {
 function parseReceipt(text) {
   const norm = String(text || "").normalize("NFKC");
   const ys = [], lines = [];                                                   // ys: その行に「¥」があったか(品名の末尾の数字を値段と間違えない手がかり)
-  norm.split("\n").forEach(raw => {
+  norm.split("\n").forEach(raw0 => {
+    const raw = raw0.replace(/[฿￡£]/g, " ").replace(/(^|\s)[·•・‧∙](?=\d)/g, "$1¥");     // 文字コピーで「¥」が「·」「฿」に化けることがある
     const l = raw.replace(/[¥￥\\]/g, " ").replace(/(^|\s)Y(?=\d)/g, "$1 ").replace(/\s+/g, " ").trim();
     if (l) { lines.push(l); ys.push(/[¥￥\\]|(^|\s)Y\d/.test(raw)); }
   });
@@ -1681,6 +1682,7 @@ function parseReceipt(text) {
         continue;
       }
       if (!/レジ袋/.test(l) && (RECEIPT_SKIP.test(l) || RECEIPT_LABEL.test(l))) continue;     // レジ袋(¥8など)は列の数をそろえるため品名として数える
+      if (/^[A-Z]?[*※#]*$/.test(l) || /^[大中小]$/.test(l) || (!ys[i] && /^\d{1,6}$/.test(l))) continue;   // 「A*」「大」や,商品コードだけの行(¥なしの数字)は飛ばす
       const po = l.match(PRICE_ONLY);
       if (po) {
         if (!queue.length) { extra.push(parseInt(po[1].replace(/,/g, ""), 10)); continue; }   // 品名が残っていない値段(小計など)は商品ではない
