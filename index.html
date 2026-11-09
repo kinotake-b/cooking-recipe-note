@@ -330,11 +330,16 @@
     max-width: 480px; margin: 0 auto; text-align: center; white-space: pre-line;
     background: var(--ink); color: #fff; border-radius: 14px; padding: 12px 16px; font-size: 14px;
   }
+  /* アプリの切り替え(レシピ帳 / カフェ帳) */
+  .appsw { display: flex; gap: 4px; width: max-content; margin-top: 12px; padding: 3px; background: var(--soft); border-radius: 12px; }
+  .appsw a { display: grid; place-items: center; min-height: 36px; padding: 0 16px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--sub); text-decoration: none; }
+  .appsw a[aria-current] { background: var(--bg); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
 </style>
 </head>
 <body>
 
 <header id="top" class="page" style="padding-bottom:0">
+  <nav class="appsw" aria-label="アプリの切り替え"><a aria-current="page">レシピ帳</a><a href="https://kinotake-b.github.io/cafe-note/">カフェ帳</a></nav>
   <div class="head">
     <h1 id="pageTitle">レシピ帳</h1>
     <button class="ring" id="lvBtn" aria-label="レベルと記録を見る">
