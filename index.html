@@ -2733,5 +2733,27 @@ $("file").onchange = async e => {
 show("list");
 renderList();
 </script>
+<script>
+/* アプリの切り替え: ページを移動せず、もう一方のアプリを重ねて表示する。
+   ホーム画面に追加したアプリから別のページへ移ると、ブラウザの枠が出てしまうため。 */
+(function () {
+  var link = document.querySelector('.appsw a[href]'); if (!link) return;
+  var frame = null, embedded = window.parent !== window;
+  link.addEventListener('click', function (e) {
+    e.preventDefault();
+    if (embedded) { try { window.parent.postMessage({ appsw: 'back' }, location.origin); } catch (x) {} return; }
+    if (!frame) {
+      frame = document.createElement('iframe');
+      frame.title = link.textContent; frame.allow = 'geolocation'; frame.src = link.href;
+      frame.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;border:0;background:#fff;z-index:1000';
+      document.body.appendChild(frame);
+    }
+    frame.hidden = false;
+  });
+  window.addEventListener('message', function (e) {
+    if (frame && e.source === frame.contentWindow && e.data && e.data.appsw === 'back') frame.hidden = true;
+  });
+})();
+</script>
 </body>
 </html>
