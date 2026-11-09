@@ -2724,9 +2724,12 @@ $("file").onchange = async e => {
     const data = JSON.parse(await f.text());
     const list = Array.isArray(data) ? data : data.recipes;      // 以前の形式(レシピだけの配列)も読める
     if (!Array.isArray(list)) throw 0;
-    if (!confirm(`${list.length}件を読み込みます．今ある${recipes.length}件は置き換わります．よろしいですか?`)) return;
-    recipes = list.map(normalize); persist();
-    if (!Array.isArray(data) && data.meta) { meta = { pantry: [], xp: 0, log: [], prices: [], mainStore: "", useRef: true, ...data.meta }; persistMeta(); }
+    const have = new Set(recipes.map(r => r.id));
+    const add = list.filter(r => r && typeof r === "object").map(r => normalize(r.id ? r : { ...r, id: uid() })).filter(r => !have.has(r.id));
+    if (!confirm(`ファイルの${list.length}件のうち，今ない${add.length}件を追加します．今ある記録は変わりません．よろしいですか?`)) return;
+    recipes = recipes.concat(add); persist();
+    const mineEmpty = !(meta.xp || meta.pantry.length || meta.log.length || meta.prices.length);   // 食材庫・XP・値段帳は，今が空のときだけ取り込む
+    if (!Array.isArray(data) && data.meta && mineEmpty) { meta = { pantry: [], xp: 0, log: [], prices: [], mainStore: "", useRef: true, ...data.meta }; persistMeta(); }
     updateBadge(); renderList();
   } catch { alert("読み込めませんでした．書き出したファイルを選んでください．"); }
   e.target.value = "";

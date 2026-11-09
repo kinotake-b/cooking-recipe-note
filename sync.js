@@ -4,7 +4,7 @@
    考え方
    - 記録は1件ずつ、クラウドの表に入れる(user_id + id が1行)。
    - 同じ記録が両方にあれば「あとから変えたほう」が勝つ(最終更新の時刻で決める)。
-   - 消した記録は deleted=true の行として残し、別の端末にも「消した」を伝える。
+   - 消した記録は deleted=true の印を付けて残し(中身は消さない)、別の端末にも「消した」を伝える。
    - どの記録が変わったかは、中身の指紋(ハッシュ)を前回と比べて見つける。
      だから、アプリ側の編集処理は直さず、保存のあとで Sync.changed() を呼ぶだけでよい。
    - ログインは「メール+パスワード」。メールのリンク方式は、iPhoneのホーム画面アプリだと
@@ -166,14 +166,19 @@
   }
   function pushItems(ids, uid) {
     if (!ids.length) return Promise.resolve();
-    var have = {}, rows = [];
+    var have = {}, rows = [], gone = [];
     cfg.getItems().forEach(function (it) { have[it.id] = it; });
     ids.forEach(function (id) {
       if (have[id] && st.u[id]) rows.push({ user_id: uid, id: id, data: have[id], updated_at: new Date(st.u[id]).toISOString(), deleted: false });
-      else if (st.del[id]) rows.push({ user_id: uid, id: id, data: {}, updated_at: new Date(st.del[id]).toISOString(), deleted: true });
+      else if (st.del[id]) gone.push(id);
     });
     return seq(chunks(rows, 8), function (batch) {
       return rest('POST', cfg.items + '?on_conflict=user_id,id', batch, { Prefer: 'resolution=merge-duplicates,return=minimal' });
+    }).then(function () {
+      // 消した記録: クラウドの「中身」はそのまま残し、「削除済み」の印と時刻だけを書き換える
+      return seq(gone, function (id) {
+        return rest('PATCH', cfg.items + '?id=eq.' + encodeURIComponent(id), { deleted: true, updated_at: new Date(st.del[id]).toISOString() }, { Prefer: 'return=minimal' });
+      });
     });
   }
   function syncMeta(uid) {
