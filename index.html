@@ -337,6 +337,7 @@
 </style>
 </head>
 <body>
+<script src="sync.js?v=1"></script>
 
 <header id="top" class="page" style="padding-bottom:0">
   <nav class="appsw" aria-label="アプリの切り替え"><a aria-current="page">レシピ帳</a><a href="https://kinotake-b.github.io/cafe-note/">カフェ帳</a></nav>
@@ -356,6 +357,7 @@
     <div class="filters" id="filters"></div>
     <div id="cards"></div>
     <div class="tools">
+      <div id="syncBox"></div>
       <div class="sm">データはこの端末のブラウザに保存されています．機種変更や消去に備えて，ときどきバックアップしてください．</div>
       <div class="row">
         <button class="btn" id="export">書き出す</button>
@@ -861,7 +863,7 @@ let filter = "all";
 let view = "list";
 
 function persist() {
-  try { localStorage.setItem(KEY, JSON.stringify(recipes)); return true; }
+  try { localStorage.setItem(KEY, JSON.stringify(recipes)); if (window.Sync) Sync.changed(); return true; }
   catch { alert("保存できませんでした．写真が多すぎるかもしれません．バックアップを書き出してから，古い写真を消してください．"); return false; }
 }
 const $ = id => document.getElementById(id);
@@ -899,7 +901,7 @@ function loadMeta() {
   try { return { ...base, ...JSON.parse(localStorage.getItem(META_KEY)) }; } catch { return base; }
 }
 let meta = loadMeta();
-function persistMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch { /* 保存できない環境では何もしない */ } }
+function persistMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(meta)); if (window.Sync) Sync.changed(); } catch { /* 保存できない環境では何もしない */ } }
 
 const TITLES = ["はじめの一歩", "台所の見習い", "家庭料理人", "味見の達人", "腕の立つ料理人", "食卓の主役", "一品の匠", "世界の料理人", "厨房の達人", "伝説のシェフ"];
 const need = L => 50 * L * (L - 1);                       // Lv.Lになるのに必要なXP
@@ -2732,6 +2734,18 @@ $("file").onchange = async e => {
 
 show("list");
 renderList();
+if (window.Sync) {
+  Sync.init({
+    name: "recipe", items: "recipes", meta: "user_meta",
+    getItems: () => recipes,
+    setItems: a => { recipes = a.map(normalize); persist(); },
+    getMeta: () => meta,
+    setMeta: m => { meta = { pantry: [], xp: 0, log: [], prices: [], mainStore: "", useRef: true, ...m }; persistMeta(); },
+    metaScore: m => (m.xp || 0) + (m.pantry || []).length + (m.log || []).length + (m.prices || []).length,
+    onApplied: () => { updateBadge(); renderList(); if (view === "map") renderMap(); }
+  });
+  Sync.mountUI($("syncBox"));
+}
 </script>
 <script>
 /* アプリの切り替え: ページを移動せず、もう一方のアプリを重ねて表示する。
