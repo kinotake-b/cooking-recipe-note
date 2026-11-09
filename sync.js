@@ -14,8 +14,8 @@
 
   /* ★ Supabase の「Project Settings → API」にある2つの値を、ここに入れる。
      anon キーは「公開してよい鍵」で、記録を守っているのは表ごとの行の制限(RLS)。 */
-  var SUPABASE_URL = '';   // 例: https://abcdxxxx.supabase.co
-  var SUPABASE_KEY = '';   // 例: eyJhbGciOi... (anon public)
+  var SUPABASE_URL = 'https://rolzxkweqhoqgrheybpl.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_c2OeVNgE3y_WolKC61fFrQ_g7h8CAMm';   // 公開用のキー(sb_publishable_…)。sb_secret_… や service_role は絶対に入れない
 
   var AUTH_KEY = 'kinotake-sync-auth';       // ログイン情報。レシピ帳とカフェ帳で共有する(同じサイトなので)
   var CONF_KEY = 'kinotake-sync-config';     // テスト用: {url,key} を入れると上の値より優先する
