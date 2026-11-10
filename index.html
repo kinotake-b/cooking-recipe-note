@@ -1878,7 +1878,7 @@ $("rPhotoFile").onchange = async e => {
   msg.style.color = ""; msg.textContent = "読み取り中…(10秒ほどかかります)"; btn.disabled = true;
   try {
     const image = await shrinkImage(f, 1800);
-    const res = await Sync.callFn("read-receipt", { image, mime: "image/jpeg" });
+    const res = await Sync.callFn("read-photo", { kind: "receipt", image, mime: "image/jpeg" });
     const items = res.items || [];
     receiptFixed = new Set();
     renderReceiptList({ items: pairReceipt(items.map(i => i.name), items.map(i => i.price)), date: res.date || "", store: "" });

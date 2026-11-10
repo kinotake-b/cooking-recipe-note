@@ -1,4 +1,7 @@
-// read-receipt: レシートの写真を Gemini で読み、店名・日付・品名・値段を JSON で返す(Supabase の Edge Function)
+// read-photo: 写真を Gemini で読み、JSON で返す(Supabase の Edge Function)
+//   kind = "receipt"(既定): レシート → 店名・日付・合計・品名と値段
+//   kind = "coffee"        : コーヒー豆の袋・ラベル・メニュー → 豆の情報(産地・焙煎度など)
+// レシピ帳とカフェ帳の両方が、この1つを使う。
 //
 // なぜ中継が要るか: Gemini のキーをアプリ(公開ページ)に入れると、誰でも盗んで使えてしまう。
 //   キーは Supabase の「Secrets」にだけ置き、アプリは「ログイン中の本人」としてこの関数を呼ぶ。
@@ -16,7 +19,8 @@ const ALLOWED = (Deno.env.get("ALLOWED_EMAILS") ?? "").split(",").map((s) => s.t
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const MAX_BASE64 = 6_000_000; // 写真(base64)の最大の長さ。約4.5MBの写真
 
-const SCHEMA = {
+/* ---------- レシート ---------- */
+const RECEIPT_SCHEMA = {
   type: "object",
   properties: {
     store: { type: "string", description: "店名(支店名つき)" },
@@ -37,8 +41,8 @@ const SCHEMA = {
   required: ["items"],
 };
 
-const PROMPT = `日本のレシートの写真です。内容を読み取って、JSONで返してください。
-- store: 店名(支店名があればつける)。
+const RECEIPT_PROMPT = `日本のレシートの写真です。内容を読み取って、JSONで返してください。
+- store: 店名(支店名があればつける)。レシートの上のほうにある店名・ロゴ・「〇〇店」の行を探す。読めなければ空文字。
 - date: 買った日を YYYY-MM-DD で。和暦なら西暦に直す。読めなければ空文字。
 - total: レシートの合計金額(円)。読めなければ0。
 - items: 買った商品の行だけ。
@@ -48,6 +52,48 @@ const PROMPT = `日本のレシートの写真です。内容を読み取って�
 - 写真がレシートでない、または読めないときは items を空の配列にする。
 JSON以外の文章は返さないでください。`;
 
+/* ---------- コーヒー豆 ---------- */
+const ROASTS = ["浅煎り", "中煎り", "中深煎り", "深煎り"];
+const COFFEE_SCHEMA = {
+  type: "object",
+  properties: {
+    beans: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          roaster: { type: "string", description: "ロースター(焙煎所)・ブランド名" },
+          name: { type: "string", description: "商品名・豆の名前" },
+          origin: { type: "string", description: "産地(国と地域。例: エチオピア イルガチェフェ)" },
+          producer: { type: "string", description: "生産者・農園・ウォッシングステーション" },
+          variety: { type: "string", description: "品種(例: ゲイシャ、ブルボン)" },
+          process: { type: "string", description: "精製方法(例: ウォッシュト、ナチュラル、ハニー)" },
+          roast: { type: "string", description: "焙煎度。浅煎り・中煎り・中深煎り・深煎りのどれか、分からなければ空" },
+          notes: { type: "array", items: { type: "string" }, description: "フレーバーの言葉(日本語)" },
+          roast_date: { type: "string", description: "焙煎日。読めたときだけ" },
+        },
+      },
+    },
+  },
+  required: ["beans"],
+};
+
+const COFFEE_PROMPT = `コーヒー豆の袋・ラベル・パッケージ・メニュー・黒板などの写真です。写っているコーヒー豆の情報を読み取って、JSONで返してください。
+- beans: 豆ごとに1件(メニューに複数の豆が載っていれば、それぞれ。最大6件)。
+  - roaster: ロースター(焙煎所)やブランド名。
+  - name: 商品名・豆の名前。
+  - origin: 産地。国と地域(例: エチオピア イルガチェフェ)。英語表記は日本語に直す。
+  - producer: 生産者・農園・ウォッシングステーション。
+  - variety: 品種。
+  - process: 精製方法(ウォッシュト・ナチュラル・ハニーなど。日本語で)。
+  - roast: 焙煎度。浅煎り・中煎り・中深煎り・深煎りのどれか。Light/Medium/Dark などの表記や、1〜8段階の目盛りは、近いものに直す。判断できなければ空文字。
+  - notes: フレーバーの言葉(日本語。例: ["ベリー", "チョコレート"])。
+  - roast_date: 焙煎日が読めたときだけ。
+- 写っていない項目は空文字にする。推測で補わない(写っていない産地や品種を書かない)。
+- 写真にコーヒー豆の情報が無いときは、beans を空の配列にする。
+JSON以外の文章は返さないでください。`;
+
+/* ---------- 共通 ---------- */
 function cors(req: Request) {
   const o = req.headers.get("origin") ?? "";
   const ok = /^https:\/\/kinotake-b\.github\.io$/.test(o) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o);
@@ -73,66 +119,90 @@ async function userEmail(req: Request): Promise<string | null> {
   return String(u.email ?? "").toLowerCase() || null;
 }
 
-// 返ってきた文章の中から、{ items: [...] } の形のJSONを探す(返り方が変わっても拾えるように)
-function findJson(node: unknown): { items: unknown[] } | null {
+// 返ってきた文章の中から、{ <key>: [...] } の形のJSONを探す(返り方が変わっても拾えるように)
+function findJson(node: unknown, key: string): Record<string, unknown> | null {
   if (typeof node === "string") {
     const t = node.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
     if (t.startsWith("{")) {
       try {
         const o = JSON.parse(t);
-        if (o && Array.isArray(o.items)) return o;
+        if (o && Array.isArray(o[key])) return o;
       } catch { /* 次へ */ }
     }
     return null;
   }
   if (Array.isArray(node)) {
-    for (const x of node) { const r = findJson(x); if (r) return r; }
+    for (const x of node) { const r = findJson(x, key); if (r) return r; }
     return null;
   }
   if (node && typeof node === "object") {
     for (const k of Object.keys(node as Record<string, unknown>)) {
-      const r = findJson((node as Record<string, unknown>)[k]);
+      const r = findJson((node as Record<string, unknown>)[k], key);
       if (r) return r;
     }
   }
   return null;
 }
 
-async function askInteractions(image: string, mime: string) {
+async function askInteractions(prompt: string, schema: unknown, image: string, mime: string) {
   const r = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
     method: "POST",
     headers: { "x-goog-api-key": GEMINI_API_KEY, "Content-Type": "application/json", "Api-Revision": "2026-05-20" },
     body: JSON.stringify({
       model: GEMINI_MODEL,
-      input: [{ type: "text", text: PROMPT }, { type: "image", data: image, mime_type: mime }],
-      response_format: { type: "text", mime_type: "application/json", schema: SCHEMA },
+      input: [{ type: "text", text: prompt }, { type: "image", data: image, mime_type: mime }],
+      response_format: { type: "text", mime_type: "application/json", schema },
     }),
   });
-  const text = await r.text();
-  return { ok: r.ok, status: r.status, text };
+  return { ok: r.ok, status: r.status, text: await r.text() };
 }
-async function askGenerateContent(image: string, mime: string) {
+async function askGenerateContent(prompt: string, schema: unknown, image: string, mime: string) {
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
     method: "POST",
     headers: { "x-goog-api-key": GEMINI_API_KEY, "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: PROMPT + "\n形式:" + JSON.stringify(SCHEMA) }, { inline_data: { mime_type: mime, data: image } }] }],
+      contents: [{ parts: [{ text: prompt + "\n形式:" + JSON.stringify(schema) }, { inline_data: { mime_type: mime, data: image } }] }],
       generationConfig: { responseMimeType: "application/json" },
     }),
   });
-  const text = await r.text();
-  return { ok: r.ok, status: r.status, text };
+  return { ok: r.ok, status: r.status, text: await r.text() };
 }
 
-function clean(o: { items: unknown[]; store?: unknown; date?: unknown; total?: unknown }) {
+const str = (v: unknown, n: number) => String(v ?? "").trim().slice(0, n);
+const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+
+function cleanReceipt(o: Record<string, unknown>) {
   const items = (o.items as Array<Record<string, unknown>>)
-    .map((i) => ({ name: String(i?.name ?? "").trim().slice(0, 60), price: Math.round(Number(i?.price)) }))
+    .map((i) => ({ name: str(i?.name, 60), price: Math.round(Number(i?.price)) }))
     .filter((i) => i.name && Number.isFinite(i.price) && i.price > 0 && i.price <= 1_000_000)
     .slice(0, 80);
   const date = /^\d{4}-\d{2}-\d{2}$/.test(String(o.date ?? "")) ? String(o.date) : "";
   const total = Number.isFinite(Number(o.total)) && Number(o.total) > 0 ? Math.round(Number(o.total)) : 0;
-  return { store: String(o.store ?? "").trim().slice(0, 40), date, total, items };
+  return { store: str(o.store, 40), date, total, items };
 }
+
+function cleanCoffee(o: Record<string, unknown>) {
+  const beans = (o.beans as Array<Record<string, unknown>>)
+    .map((b) => ({
+      roaster: str(b?.roaster, 40),
+      name: str(b?.name, 60),
+      origin: str(b?.origin, 60),
+      producer: str(b?.producer, 60),
+      variety: str(b?.variety, 40),
+      process: str(b?.process, 40),
+      roast: ROASTS.includes(str(b?.roast, 10)) ? str(b?.roast, 10) : "",
+      notes: arr(b?.notes).map((n) => str(n, 20)).filter(Boolean).slice(0, 8),
+      roast_date: str(b?.roast_date, 20),
+    }))
+    .filter((b) => b.name || b.origin || b.roaster)
+    .slice(0, 6);
+  return { beans };
+}
+
+const KINDS: Record<string, { prompt: string; schema: unknown; key: string; clean: (o: Record<string, unknown>) => unknown }> = {
+  receipt: { prompt: RECEIPT_PROMPT, schema: RECEIPT_SCHEMA, key: "items", clean: cleanReceipt },
+  coffee: { prompt: COFFEE_PROMPT, schema: COFFEE_SCHEMA, key: "beans", clean: cleanCoffee },
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(req) });
@@ -143,10 +213,12 @@ Deno.serve(async (req) => {
   if (!ALLOWED.includes(email)) return json(req, 403, { error: "このアカウントは使えません" });
   if (!GEMINI_API_KEY) return json(req, 500, { error: "Geminiのキーが設定されていません(Supabaseの Secrets)" });
 
-  let body: { image?: string; mime?: string };
+  let body: { image?: string; mime?: string; kind?: string };
   try { body = await req.json(); } catch { return json(req, 400, { error: "送られた内容が読めません" }); }
   const image = String(body.image ?? "");
   const mime = /^image\/(jpeg|png|webp)$/.test(String(body.mime)) ? String(body.mime) : "image/jpeg";
+  const spec = KINDS[String(body.kind ?? "receipt")];
+  if (!spec) return json(req, 400, { error: "kind が正しくありません" });
   if (!image) return json(req, 400, { error: "写真がありません" });
   if (image.length > MAX_BASE64) return json(req, 413, { error: "写真が大きすぎます" });
 
@@ -154,12 +226,12 @@ Deno.serve(async (req) => {
   const tried: string[] = [];
   for (const ask of [askInteractions, askGenerateContent]) {
     try {
-      const r = await ask(image, mime);
+      const r = await ask(spec.prompt, spec.schema, image, mime);
       if (!r.ok) { tried.push(`${ask.name}:${r.status} ${r.text.slice(0, 160)}`); continue; }
       let parsed: unknown = null;
       try { parsed = JSON.parse(r.text); } catch { parsed = r.text; }
-      const found = findJson(parsed);
-      if (found) return json(req, 200, clean(found));
+      const found = findJson(parsed, spec.key);
+      if (found) return json(req, 200, spec.clean(found));
       tried.push(`${ask.name}:返事の中にJSONが見つかりません`);
     } catch (e) {
       tried.push(`${ask.name}:${String(e).slice(0, 120)}`);
