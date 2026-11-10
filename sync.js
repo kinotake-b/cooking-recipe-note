@@ -230,6 +230,25 @@
       .then(function () { running = false; if (again) { again = false; return run(); } });
   }
 
+  /* ---------- Supabase の Edge Function を呼ぶ(ログイン中の人だけ) ---------- */
+  function callFn(name, body) {
+    var c = conf();
+    if (!configured()) return Promise.reject(new Error('同期の設定が入っていません'));
+    return token().then(function (a) {
+      return fetch(c.url + '/functions/v1/' + name, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: c.key, Authorization: 'Bearer ' + a.access_token },
+        body: JSON.stringify(body)
+      }).catch(function () { var e = new Error('通信できませんでした'); e.net = true; throw e; });
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) { var e = new Error(j.error || ('サーバーのエラー(' + r.status + ')')); e.status = r.status; e.detail = j.detail; throw e; }
+        return j;
+      });
+    });
+  }
+  function isLoggedIn() { return configured() && !!getAuth(); }
+
   /* ---------- アプリから呼ぶもの ---------- */
   function changed() {
     if (!cfg || applying) return;
@@ -303,5 +322,5 @@
     listeners.push(draw); draw();
   }
 
-  window.Sync = { init: init, changed: changed, run: run, mountUI: mountUI };
+  window.Sync = { init: init, changed: changed, run: run, mountUI: mountUI, callFn: callFn, isLoggedIn: isLoggedIn };
 })();

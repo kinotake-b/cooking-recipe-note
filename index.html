@@ -518,7 +518,10 @@
   <div class="ps-bk" data-rs="close"></div>
   <div class="ps-card tall">
     <div class="ps-head"><b>レシートから登録</b><button class="btn text" data-rs="close">閉じる</button></div>
-    <div class="sm">スマホでレシートの写真を開き，写っている文字をコピーして，下に貼り付けます．(iPhone:写真の文字を長押し／Android:Googleレンズで「テキスト」を選ぶ)</div>
+    <div class="row" style="margin-top:12px"><button class="btn primary" id="rPhoto">写真から読み取る</button></div>
+    <input id="rPhotoFile" type="file" accept="image/*" hidden>
+    <div class="sm" id="rPhotoMsg" style="margin-top:6px"></div>
+    <div class="sm" style="margin-top:12px">写真を使わない場合:スマホでレシートの写真を開き，写っている文字をコピーして，下に貼り付けます．(iPhone:写真の文字を長押し／Android:Googleレンズで「テキスト」を選ぶ)</div>
     <textarea id="rText" rows="6" placeholder="ここに貼り付け" style="margin-top:8px"></textarea>
     <div class="two">
       <div><label class="l" for="rStore">お店</label><input id="rStore" list="storeList" placeholder="例:○○スーパー"></div>
@@ -1816,7 +1819,7 @@ $("pDel").onclick = () => {
 /* レシート取り込み:スマホで写真の文字をコピーして貼る → 品名と値段を拾う → 内容量を確かめて登録 */
 function openReceipt() {
   refreshLists();
-  $("rText").value = ""; $("rList").innerHTML = ""; $("rSave").hidden = true; receiptDate = "";
+  $("rText").value = ""; $("rList").innerHTML = ""; $("rSave").hidden = true; receiptDate = ""; $("rPhotoMsg").textContent = "";
   $("rStore").value = meta.mainStore || "";
   $("rsheet").hidden = false;
 }
@@ -1848,6 +1851,47 @@ function renderReceiptList(res) {
   $("rSave").hidden = !items.length;
 }
 $("rParse").onclick = () => { receiptFixed = new Set(); renderReceiptList(parseReceipt($("rText").value)); };
+
+/* レシートの写真から読み取る: 写真を縮めて,Supabaseの中継(Edge Function)経由でGeminiに読ませる.キーはアプリの中に置かない */
+function shrinkImage(file, max) {
+  return new Promise((ok, ng) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const r = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement("canvas");
+      c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); ok(c.toDataURL("image/jpeg", 0.82).split(",")[1]);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); ng(new Error("この写真は読み込めませんでした")); };
+    img.src = url;
+  });
+}
+$("rPhoto").onclick = () => {
+  if (!window.Sync || !Sync.isLoggedIn()) { const m = $("rPhotoMsg"); m.style.color = "#b3261e"; m.textContent = "写真の読み取りには、ログインが必要です(レシピ一覧の一番下の「クラウド同期」でログインしてください)．"; return; }
+  $("rPhotoFile").click();
+};
+$("rPhotoFile").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  const msg = $("rPhotoMsg"), btn = $("rPhoto");
+  msg.style.color = ""; msg.textContent = "読み取り中…(10秒ほどかかります)"; btn.disabled = true;
+  try {
+    const image = await shrinkImage(f, 1800);
+    const res = await Sync.callFn("read-receipt", { image, mime: "image/jpeg" });
+    const items = res.items || [];
+    receiptFixed = new Set();
+    renderReceiptList({ items: pairReceipt(items.map(i => i.name), items.map(i => i.price)), date: res.date || "", store: res.store || "" });
+    const sum = items.reduce((s, i) => s + i.price, 0), off = res.total && sum !== res.total;
+    msg.style.color = off ? "var(--accent)" : "";
+    msg.textContent = !items.length ? "品名が見つかりませんでした．レシート全体が写っているか確かめてください．"
+      : off ? `品名の合計(${sum}円)が，レシートの合計(${res.total}円)と合いません．読み違いや読み落としがないか確かめてください．`
+      : "読み取りました．内容を確かめてから登録してください．";
+  } catch (err) {
+    msg.style.color = "#b3261e";
+    msg.textContent = err.message === "NOAUTH" ? "ログインが必要です．" : `読み取れませんでした:${err.message}${err.detail ? `(${err.detail})` : ""}`;
+  }
+  btn.disabled = false;
+};
 $("rList").addEventListener("change", e => { if (e.target.classList.contains("rn")) e.target.value = fixTypedName(e.target.value); });     // 手で直した品名も読み間違いを直す
 $("rSave").onclick = () => {
   const store = $("rStore").value.trim();

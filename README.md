@@ -14,3 +14,6 @@ AIが考えたレシピを貼り付けて貯めておく，個人用の料理レ
 ## クラウド同期
 - `sync.js` が Supabase と記録を同期する(カフェ帳と同じアカウント・同じプロジェクト)。設定の手順は `cafe-app/supabase/手順.md`
 - `sync.js` は `cafe-app/` にも同じ内容で置いてある。直したら両方に反映する
+
+## レシートの写真読み取り
+- 「レシートから登録」の「写真から読み取る」。Gemini を、Supabase の中継(`supabase/functions/read-receipt/index.ts`)経由で呼ぶ。設定は `cafe-app/supabase/手順-レシート読み取り.md`
