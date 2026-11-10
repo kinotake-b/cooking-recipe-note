@@ -1881,12 +1881,14 @@ $("rPhotoFile").onchange = async e => {
     const res = await Sync.callFn("read-receipt", { image, mime: "image/jpeg" });
     const items = res.items || [];
     receiptFixed = new Set();
-    renderReceiptList({ items: pairReceipt(items.map(i => i.name), items.map(i => i.price)), date: res.date || "", store: res.store || "" });
+    renderReceiptList({ items: pairReceipt(items.map(i => i.name), items.map(i => i.price)), date: res.date || "", store: "" });
+    if (res.store) $("rStore").value = fixStoreName(res.store);                  // メインのスーパーより,レシートの店名を優先する
+    const storeNote = res.store ? `お店:${$("rStore").value}．` : "お店の名前は読み取れませんでした(お店の欄を確かめてください)．";
     const sum = items.reduce((s, i) => s + i.price, 0), off = res.total && sum !== res.total;
     msg.style.color = off ? "var(--accent)" : "";
     msg.textContent = !items.length ? "品名が見つかりませんでした．レシート全体が写っているか確かめてください．"
-      : off ? `品名の合計(${sum}円)が，レシートの合計(${res.total}円)と合いません．読み違いや読み落としがないか確かめてください．`
-      : "読み取りました．内容を確かめてから登録してください．";
+      : off ? `${storeNote}品名の合計(${sum}円)が，レシートの合計(${res.total}円)と合いません．読み違いや読み落としがないか確かめてください．`
+      : `${storeNote}読み取りました．内容を確かめてから登録してください．`;
   } catch (err) {
     msg.style.color = "#b3261e";
     msg.textContent = err.message === "NOAUTH" ? "ログインが必要です．" : `読み取れませんでした:${err.message}${err.detail ? `(${err.detail})` : ""}`;
