@@ -185,6 +185,19 @@
     if (!cfg.meta) return Promise.resolve();
     return rest('GET', cfg.meta + '?select=data,updated_at').then(function (rows) {
       var r = rows && rows[0], rt = r ? Date.parse(r.updated_at) : 0, local = cfg.getMeta();
+      // 合わせ方をアプリが用意しているときは、上書きせずに両方を合わせる(片方の端末で足した分が消えない)
+      if (r && cfg.mergeMeta) {
+        var merged = cfg.mergeMeta(local, r.data, st.mu > rt), mh = hash(canon(merged));
+        if (mh !== hash(canon(local))) {
+          applying = true;
+          try { cfg.setMeta(merged); } finally { applying = false; }
+          pulled = true;
+        }
+        st.mh = hash(canon(cfg.getMeta()));
+        if (hash(canon(cfg.getMeta())) === hash(canon(r.data))) { st.mu = Math.max(st.mu, rt); return; }   // クラウドと同じなら送らない
+        st.mu = Math.max(Date.now(), rt + 1);
+        return rest('POST', cfg.meta + '?on_conflict=user_id', { user_id: uid, data: cfg.getMeta(), updated_at: new Date(st.mu).toISOString() }, { Prefer: 'resolution=merge-duplicates,return=minimal' });
+      }
       var pushIt = false;
       if (!r) pushIt = !!(st.mu || (cfg.metaScore && cfg.metaScore(local) > 0));
       else if (st.mu === 0) pushIt = !!(cfg.metaScore && cfg.metaScore(local) > cfg.metaScore(r.data));   // 初回: 中身が多いほうを残す
@@ -279,9 +292,10 @@
   function redraw() { listeners.forEach(function (f) { try { f(); } catch (e) { /* 何もしない */ } }); }
 
   /* ---------- 画面(同期の欄) ---------- */
+  function punct(s) { return cfg && cfg.punct === 'comma' ? String(s).replace(/、/g, '，').replace(/。/g, '．') : s; }   // アプリの句読点に合わせる
   function mk(tag, text, props) {
     var el = document.createElement(tag);
-    if (text) el.textContent = text;
+    if (text) el.textContent = punct(text);
     for (var k in props) if (props.hasOwnProperty(k)) { if (k === 'style') el.style.cssText = props[k]; else if (k === 'class') el.className = props[k]; else el.setAttribute(k, props[k]); }
     return el;
   }
@@ -322,5 +336,5 @@
     listeners.push(draw); draw();
   }
 
-  window.Sync = { init: init, changed: changed, run: run, mountUI: mountUI, callFn: callFn, isLoggedIn: isLoggedIn };
+  window.Sync = { init: init, changed: changed, run: run, mountUI: mountUI, callFn: callFn, isLoggedIn: isLoggedIn, punct: function (s) { return punct(s); } };
 })();

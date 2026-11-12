@@ -96,11 +96,12 @@
   .filters::-webkit-scrollbar { display: none; }
   .fchip { flex: none; min-height: 36px; padding: 0 14px; border-radius: 99px; background: var(--soft); font-size: 14px; }
   .fchip.on { background: var(--ink); color: #fff; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 12px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 12px; align-items: start; }   /* 文の長さが違うカードでも上をそろえる */
   .item { display: block; width: 100%; text-align: left; }
   .ph { aspect-ratio: 1; border-radius: 16px; background: var(--soft); overflow: hidden; display: grid; place-items: center; }
   .ph img { width: 100%; height: 100%; object-fit: cover; }
-  .ph span { font: 600 44px var(--serif); color: #d6d0c6; }
+  .ph .dish { width: 48%; aspect-ratio: 1; border-radius: 50%; border: 1.5px dashed #d6d0c6; display: grid; place-items: center; }   /* 写真がないときは「空のお皿」(空の画面と同じ形) */
+  .ph .dish i { width: 52%; aspect-ratio: 1; border-radius: 50%; background: var(--bg); }
   .item h3 {
     font: 600 15px/1.5 var(--serif); margin: 8px 0 2px;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
@@ -337,7 +338,7 @@
 </style>
 </head>
 <body>
-<script src="sync.js?v=1"></script>
+<script src="sync.js?v=2"></script>
 
 <header id="top" class="page" style="padding-bottom:0">
   <nav class="appsw" aria-label="アプリの切り替え"><a aria-current="page">レシピ帳</a><a href="https://kinotake-b.github.io/cafe-note/">カフェ帳</a></nav>
@@ -359,6 +360,7 @@
     <div class="tools">
       <div id="syncBox"></div>
       <div class="sm">データはこの端末のブラウザに保存されています．機種変更や消去に備えて，ときどきバックアップしてください．</div>
+      <div id="storageUse"></div>
       <div class="row">
         <button class="btn" id="export">書き出す</button>
         <button class="btn" id="import">読み込む</button>
@@ -430,7 +432,7 @@
 <!-- 編集 -->
 <div id="edit" class="view">
   <div class="page">
-    <div class="bar"><button class="back" id="cancel">‹ もどる</button></div>
+    <div class="bar"><button class="back" id="cancel">‹ 戻る</button></div>
 
     <div class="pastebox">
       <label class="l" for="fPaste">AIの回答をここに貼り付け</label>
@@ -866,8 +868,23 @@ let photo = "";
 let filter = "all";
 let view = "list";
 
+/* ブラウザの保存場所(localStorage)の使用量.上限はおよそ5MBで,同じサイトにあるカフェ帳と分け合っている.
+   写真は文字に直して入れているので,使用量の大半は写真になる */
+const STORE_LIMIT = 5e6;
+function storageRatio() {
+  let n = 0;
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); n += k.length + (localStorage.getItem(k) || "").length; } } catch { return 0; }
+  return n / STORE_LIMIT;
+}
+function updateStorage() {
+  const el = document.getElementById("storageUse");
+  if (!el) return;
+  const r = storageRatio(), pct = Math.min(100, Math.round(r * 100));
+  el.innerHTML = `<div class="meter" style="margin:12px 0 4px"><i style="width:${pct}%${r > 0.8 ? ";background:#b3261e" : ""}"></i></div>
+    <div class="sm">保存容量:約${(r * STORE_LIMIT / 1e6).toFixed(1)}MB / 5MB(${pct}%・目安・カフェ帳と共有)．${r > 0.8 ? "残りが少なくなっています．書き出してから，古いレシピの写真を消すと空きます．" : "大半は写真です．"}</div>`;
+}
 function persist() {
-  try { localStorage.setItem(KEY, JSON.stringify(recipes)); if (window.Sync) Sync.changed(); return true; }
+  try { localStorage.setItem(KEY, JSON.stringify(recipes)); if (window.Sync) Sync.changed(); updateStorage(); return true; }
   catch { alert("保存できませんでした．写真が多すぎるかもしれません．バックアップを書き出してから，古い写真を消してください．"); return false; }
 }
 const $ = id => document.getElementById(id);
@@ -900,9 +917,54 @@ $("lvBtn").onclick = () => { renderMap(); show("map"); };
 
 /* ---------- 食材庫・レベル・XP ---------- */
 const META_KEY = "recipe-app-meta-v1";
+/* XPは「端末ごとの小計」(xpBy)で持ち,合計を meta.xp にする.
+   こうすると,スマホとPCで同時にXPが増えても,同期でどちらかが消えない.
+   xpBy の1件 = { v: その端末で増えたXP, n: 変えた回数 }.同期では n が大きいほうが新しい */
+const DEV = (() => {
+  try {
+    let d = localStorage.getItem("recipe-device-id");
+    if (!d) { d = "d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); localStorage.setItem("recipe-device-id", d); }
+    return d;
+  } catch { return "d-unknown"; }
+})();
+const sumXp = by => Object.values(by || {}).reduce((s, e) => s + (Number(e && e.v) || 0), 0);
+function normMeta(m) {
+  m = { pantry: [], xp: 0, log: [], prices: [], mainStore: "", useRef: true, xpBy: null, priceDel: {}, pantryDel: {}, ...(m || {}) };
+  if (!m.xpBy) m.xpBy = m.xp ? { base: { v: m.xp, n: 1 } } : {};      // 以前の形式(合計だけ)からの移行
+  m.xp = sumXp(m.xpBy);
+  return m;
+}
 function loadMeta() {
-  const base = { pantry: [], xp: 0, log: [], prices: [], mainStore: "", useRef: true };
-  try { return { ...base, ...JSON.parse(localStorage.getItem(META_KEY)) }; } catch { return base; }
+  try { return normMeta(JSON.parse(localStorage.getItem(META_KEY))); } catch { return normMeta(null); }
+}
+function addXp(delta) {
+  const e = meta.xpBy[DEV] || (meta.xpBy[DEV] = { v: 0, n: 0 });
+  e.v += delta; e.n++;
+  meta.xp = sumXp(meta.xpBy);
+}
+/* 2台の端末の meta を合わせる(同期で使う).aNewer = a のほうが新しく変えられたか
+   - 値段帳・食材庫:両方にあるものを残す.消したものは「消した時刻」で判断する(消したのに復活しない)
+   - XP:端末ごとの小計を,変えた回数の多いほうで合わせる
+   - メインのスーパーなど1つだけの設定:新しく変えたほう */
+function mergeMeta(a, b, aNewer) {
+  a = normMeta(a); b = normMeta(b);
+  const newer = aNewer ? a : b;
+  const maxMap = (x, y) => { const o = { ...x }; for (const k in y) o[k] = Math.max(o[k] || 0, y[k] || 0); return o; };
+  const priceDel = maxMap(a.priceDel, b.priceDel), pantryDel = maxMap(a.pantryDel, b.pantryDel);
+  const prices = new Map();
+  for (const p of [...a.prices, ...b.prices]) { const q = prices.get(p.id); if (!q || (p.upd || 0) > (q.upd || 0)) prices.set(p.id, p); }
+  const pantry = new Map();
+  for (const p of [...a.pantry, ...b.pantry]) { const q = pantry.get(p.name); if (!q || (p.t || 0) > (q.t || 0)) pantry.set(p.name, p); }
+  const xpBy = { ...a.xpBy };
+  for (const k in b.xpBy) { const x = xpBy[k], y = b.xpBy[k]; if (!x || y.n > x.n || (y.n === x.n && y.v > x.v)) xpBy[k] = y; }
+  const seen = new Set(), log = [];
+  for (const l of [...a.log, ...b.log]) { const k = l.k || `${l.d}|${l.p}|${l.why}`; if (!seen.has(k)) { seen.add(k); log.push(l); } }
+  log.sort((x, y) => (y.d || "").localeCompare(x.d || ""));
+  return normMeta({
+    ...newer, xpBy, priceDel, pantryDel, log: log.slice(0, 30),
+    prices: [...prices.values()].filter(p => !(priceDel[p.id] >= (p.upd || 0) && priceDel[p.id])),
+    pantry: [...pantry.values()].filter(p => !(pantryDel[p.name] >= (p.t || 0) && pantryDel[p.name])),
+  });
 }
 let meta = loadMeta();
 function persistMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(meta)); if (window.Sync) Sync.changed(); } catch { /* 保存できない環境では何もしない */ } }
@@ -932,8 +994,8 @@ function gain(items) {
   const sum = items.reduce((n, i) => n + i[0], 0);
   if (!sum) return;
   const before = levelOf(meta.xp);
-  meta.xp += sum;
-  for (const [p, why] of items) meta.log.unshift({ d: today(), p, why });
+  addXp(sum);
+  for (const [p, why] of items) meta.log.unshift({ d: today(), p, why, k: uid() });
   meta.log = meta.log.slice(0, 30);
   persistMeta();
   const after = levelOf(meta.xp);
@@ -960,8 +1022,26 @@ function markMade(r) {
   if (fresh.length) items.push([fresh.length * 3, `新しい食材${fresh.length}種`]);
   r.made.push(today());
   r.lastMade = today();
+  r.madeXp = { d: today(), p: items.reduce((n, i) => n + i[0], 0) };     // 取り消すときに,付けたXPを戻すため
   persist();
   gain(items);
+}
+/* 「今日作った」の取り消し(押し間違い用).今日の記録と,そのとき付いたXPを戻す */
+function unmarkMade(r) {
+  const i = r.made.lastIndexOf(today());
+  if (i < 0) return;
+  r.made.splice(i, 1);
+  r.lastMade = r.made.length ? r.made.slice().sort().pop() : "";
+  const x = r.madeXp;
+  delete r.madeXp;
+  persist();
+  if (x && x.d === today() && x.p) {
+    addXp(-x.p);
+    meta.log.unshift({ d: today(), p: -x.p, why: "「今日作った」を取り消し", k: uid() });
+    meta.log = meta.log.slice(0, 30);
+    persistMeta(); updateBadge();
+  }
+  toast("「今日作った」を取り消しました" + (x && x.p ? `(−${x.p} XP)` : ""));
 }
 
 /* ---------- 値段帳・材料費の目安 ---------- */
@@ -1767,7 +1847,8 @@ function upsertPrice(e, id) {                       // 同じ食材・お店・�
   meta.prices ??= [];
   const t = id ? meta.prices.find(x => x.id === id)
     : meta.prices.find(x => normName(x.name) === normName(e.name) && x.store === e.store && x.unit === e.unit);
-  if (t) Object.assign(t, e, { date: e.date || today() }); else meta.prices.push({ id: uid(), ...e, date: e.date || today() });
+  const upd = Date.now();                            // 同期で「どちらが新しいか」を決める時刻
+  if (t) Object.assign(t, e, { date: e.date || today(), upd }); else meta.prices.push({ id: uid(), ...e, date: e.date || today(), upd });
   persistMeta();
 }
 function refreshIngWrap() {                          // 詳細画面の材料(材料費つき)を作り直す.チェックは残す
@@ -1814,6 +1895,7 @@ $("pSave").onclick = () => {
 $("pDel").onclick = () => {
   if (!priceEditId || !confirm("この値段を値段帳から消します．よろしいですか?")) return;
   meta.prices = meta.prices.filter(x => x.id !== priceEditId);
+  meta.priceDel[priceEditId] = Date.now();           // 消したことを別の端末にも伝える
   persistMeta(); $("psheet").hidden = true; afterPriceChange();
 };
 
@@ -1868,7 +1950,7 @@ function shrinkImage(file, max) {
   });
 }
 $("rPhoto").onclick = () => {
-  if (!window.Sync || !Sync.isLoggedIn()) { const m = $("rPhotoMsg"); m.style.color = "#b3261e"; m.textContent = "写真の読み取りには、ログインが必要です(レシピ一覧の一番下の「クラウド同期」でログインしてください)．"; return; }
+  if (!window.Sync || !Sync.isLoggedIn()) { const m = $("rPhotoMsg"); m.style.color = "#b3261e"; m.textContent = "写真の読み取りには，ログインが必要です(レシピ一覧の一番下の「クラウド同期」でログインしてください)．"; return; }
   $("rPhotoFile").click();
 };
 $("rPhotoFile").onchange = async e => {
@@ -1990,9 +2072,17 @@ function matches(r) {
   if (filter.startsWith("country:")) return r.country === filter.slice(8);
   return true;
 }
+/* 並び順に使う「最後に触った日」= 作った日と保存した日の新しいほう.
+   保存日のない古いレシピは,IDの先頭(保存した時刻を36進数にしたもの)から読み取る */
+function savedDate(r) {
+  if (r.saved) return r.saved;
+  const t = parseInt(String(r.id).slice(0, 8), 36);
+  return t > 1.5e12 && t < 4e12 ? new Date(t).toLocaleDateString("sv-SE") : "";
+}
+const touched = r => [r.lastMade || "", savedDate(r)].sort().pop();
 function renderList() {
   renderFilters();
-  const rows = recipes.filter(matches).sort((a, b) => (b.lastMade || "").localeCompare(a.lastMade || "") || b.id.localeCompare(a.id));
+  const rows = recipes.filter(matches).sort((a, b) => touched(b).localeCompare(touched(a)) || b.id.localeCompare(a.id));
   if (!rows.length) {
     $("cards").innerHTML = recipes.length
       ? `<div class="empty"><div class="sm">見つかりませんでした</div></div>`
@@ -2004,7 +2094,7 @@ function renderList() {
   }
   $("cards").innerHTML = `<div class="grid">${rows.map(r => `
     <button class="item" data-id="${r.id}">
-      <div class="ph">${r.photo ? `<img src="${r.photo}" alt="">` : `<span>${esc([...r.title][0] || "")}</span>`}</div>
+      <div class="ph">${r.photo ? `<img src="${esc(r.photo)}" alt="">` : `<span class="dish"><i></i></span>`}</div>
       <h3>${esc(r.title)}</h3>
       <div class="sm">${r.country ? `${FLAG[r.country] || ""} ${esc(r.country)} ・ ` : ""}${r.made.length ? `${r.made.length}回作った` : "気になる"}</div>
       ${costTag(r)}
@@ -2122,7 +2212,7 @@ function openDetail(id) {
   const steps = parseSteps(r.steps);
   $("detailBody").innerHTML = `
     <div class="bar"><button class="back" id="toList">‹ 一覧</button><button class="btn text" id="toEdit">編集</button></div>
-    ${r.photo ? `<div class="hero"><img src="${r.photo}" alt=""></div>` : ""}
+    ${r.photo ? `<div class="hero"><img src="${esc(r.photo)}" alt=""></div>` : ""}
     <h1 class="title ${r.title.length > 22 ? "long" : ""}">${esc(r.title)}</h1>
     ${r.summary ? `<p class="summary">${esc(r.summary)}</p>` : ""}
     <div class="tagline">
@@ -2159,7 +2249,11 @@ $("detailBody").onclick = e => {
   if (id === "toList") { renderList(); show("list"); }
   if (id === "toEdit") openEdit(current);
   if (id === "cookBtn") openCook(r);
-  if (id === "made") { markMade(r); openDetail(current); }
+  if (id === "made") {
+    if (!r.made.includes(today())) markMade(r);
+    else if (confirm("今日の「作った」記録を取り消しますか?(付いたXPも戻ります)")) unmarkMade(r);
+    openDetail(current);
+  }
   if (id === "del" && confirm(`「${r.title}」を削除します．よろしいですか?`)) {
     recipes = recipes.filter(x => x.id !== current);
     persist(); renderList(); show("list");
@@ -2269,8 +2363,13 @@ function openEdit(id) {
   rating = r.rating;
   photo = r.photo;
   drawStars(); drawPhoto();
+  editSnap = editState();
   show("edit");
 }
+/* 編集画面を開いたときと比べて,何か変えたか(戻るときの確認に使う) */
+let editSnap = "";
+const EDIT_FIELDS = ["fPaste", "fTitle", "fSummary", "fServings", "fTime", "fCountry", "fIngredients", "fSteps", "fStorage", "fExtra", "fMemo", "fTags"];
+const editState = () => JSON.stringify([EDIT_FIELDS.map(id => $(id).value), $("fAgain").checked, rating, photo]);
 
 const PART_NAME = { ingredients: "材料", steps: "作り方", storage: "保存方法", extra: "ポイント" };
 function applyParse() {
@@ -2388,9 +2487,9 @@ function closeCrop() {
 }
 function finishCrop() {
   const c = crop, out = document.createElement("canvas");
-  out.width = 720; out.height = Math.round(720 / c.ratio);
+  out.width = 640; out.height = Math.round(640 / c.ratio);          // 容量を節約するため,少し小さめにして保存する
   out.getContext("2d").drawImage(c.img, -c.x / c.sc, -c.y / c.sc, c.fw / c.sc, c.fh / c.sc, 0, 0, out.width, out.height);
-  photo = out.toDataURL("image/jpeg", 0.72);
+  photo = out.toDataURL("image/jpeg", 0.7);
   closeCrop(); drawPhoto();
 }
 $("crop").onclick = e => {
@@ -2415,7 +2514,10 @@ $("fPhotoPreview").onclick = () => { if (photo) openCrop(photo, false); };
 $("photoDel").onclick = () => { photo = ""; drawPhoto(); };
 
 
-$("cancel").onclick = () => current ? openDetail(current) : (renderList(), show("list"));
+$("cancel").onclick = () => {
+  if (editState() !== editSnap && !confirm("編集をやめて戻ります．保存していない内容は消えます．よろしいですか?")) return;
+  current ? openDetail(current) : (renderList(), show("list"));
+};
 $("save").onclick = () => {
   let title = $("fTitle").value.trim();
   const steps = $("fSteps").value.trim();
@@ -2440,7 +2542,7 @@ $("save").onclick = () => {
   const hadPhoto = prev?.photo, hadMemo = prev?.memo;
   const id = current || uid();
   if (isNew) {
-    recipes.push(normalize({ id, ...data }));
+    recipes.push(normalize({ id, saved: today(), ...data }));
   } else {
     Object.assign(prev, data);
   }
@@ -2450,6 +2552,7 @@ $("save").onclick = () => {
   if (data.photo && !hadPhoto) items.push([5, "写真"]);
   if (data.memo && !hadMemo) items.push([5, "感想メモ"]);
   gain(items);
+  if (storageRatio() > 0.8) setTimeout(() => toast("保存容量が残り少なくなっています．\nレシピ一覧の一番下で確かめられます．"), items.length ? 3600 : 0);
   openDetail(id);
 };
 
@@ -2582,7 +2685,7 @@ function renderMap() {
       <div class="accbody sm">
         <div style="margin-bottom:6px">XPのもらい方</div>
         <ul style="margin:0 0 12px;padding-left:20px">${XP_RULES.map(t => `<li>${t}</li>`).join("")}</ul>
-        ${meta.log.length ? `<div style="margin-bottom:6px">最近のXP</div><ul style="margin:0;padding-left:20px">${meta.log.slice(0, 8).map(l => `<li>${l.d} ${esc(l.why)} +${l.p}</li>`).join("")}</ul>` : ""}
+        ${meta.log.length ? `<div style="margin-bottom:6px">最近のXP</div><ul style="margin:0;padding-left:20px">${meta.log.slice(0, 8).map(l => `<li>${l.d} ${esc(l.why)} ${l.p < 0 ? "−" : "+"}${Math.abs(l.p)}</li>`).join("")}</ul>` : ""}
       </div>
     </details>`;
 }
@@ -2666,7 +2769,7 @@ function renderPantry() {
 }
 function addPantry() {
   const names = $("pAdd").value.split(/[、，,\s]+/).filter(n => n && !/^[\d０-９]/.test(n) && !/^(半分|半|少し|少々|適量|残り|あと|と|や|など)$/.test(n));
-  for (const name of names) if (!meta.pantry.some(p => p.name === name)) meta.pantry.push({ name, off: false });
+  for (const name of names) if (!meta.pantry.some(p => p.name === name)) meta.pantry.push({ name, off: false, t: Date.now() });
   $("pAdd").value = "";
   persistMeta(); renderPantry();
 }
@@ -2676,8 +2779,8 @@ $("pantryChips").onclick = e => {
   const chip = e.target.closest(".pc");
   if (!chip) return;
   const i = +chip.dataset.i;
-  if (e.target.classList.contains("x")) meta.pantry.splice(i, 1);
-  else meta.pantry[i].off = !meta.pantry[i].off;
+  if (e.target.classList.contains("x")) { meta.pantryDel[meta.pantry[i].name] = Date.now(); meta.pantry.splice(i, 1); }
+  else { meta.pantry[i].off = !meta.pantry[i].off; meta.pantry[i].t = Date.now(); }
   persistMeta(); renderPantry();
 };
 
@@ -2760,8 +2863,8 @@ $("export").onclick = () => {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = `recipes-${today()}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);      // すぐ消すと,端末によっては保存が始まる前にリンクが無効になる
 };
 $("import").onclick = () => $("file").click();
 $("file").onchange = async e => {
@@ -2776,7 +2879,7 @@ $("file").onchange = async e => {
     if (!confirm(`ファイルの${list.length}件のうち，今ない${add.length}件を追加します．今ある記録は変わりません．よろしいですか?`)) return;
     recipes = recipes.concat(add); persist();
     const mineEmpty = !(meta.xp || meta.pantry.length || meta.log.length || meta.prices.length);   // 食材庫・XP・値段帳は，今が空のときだけ取り込む
-    if (!Array.isArray(data) && data.meta && mineEmpty) { meta = { pantry: [], xp: 0, log: [], prices: [], mainStore: "", useRef: true, ...data.meta }; persistMeta(); }
+    if (!Array.isArray(data) && data.meta && mineEmpty) { meta = normMeta(data.meta); persistMeta(); }
     updateBadge(); renderList();
   } catch { alert("読み込めませんでした．書き出したファイルを選んでください．"); }
   e.target.value = "";
@@ -2784,14 +2887,17 @@ $("file").onchange = async e => {
 
 show("list");
 renderList();
+updateStorage();
 if (window.Sync) {
   Sync.init({
     name: "recipe", items: "recipes", meta: "user_meta",
     getItems: () => recipes,
     setItems: a => { recipes = a.map(normalize); persist(); },
     getMeta: () => meta,
-    setMeta: m => { meta = { pantry: [], xp: 0, log: [], prices: [], mainStore: "", useRef: true, ...m }; persistMeta(); },
+    setMeta: m => { meta = normMeta(m); persistMeta(); },
     metaScore: m => (m.xp || 0) + (m.pantry || []).length + (m.log || []).length + (m.prices || []).length,
+    mergeMeta,                                                   // 値段帳・食材庫・XPは,上書きでなく両方を合わせる
+    punct: "comma",                                              // 同期の欄の文も「，．」にそろえる
     onApplied: () => { updateBadge(); renderList(); if (view === "map") renderMap(); }
   });
   Sync.mountUI($("syncBox"));
